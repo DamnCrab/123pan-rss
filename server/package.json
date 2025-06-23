@@ -3,7 +3,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "build-frontend": "cd ../client && bun install && bun run build",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "deploy-with-frontend": "npm run build-frontend && wrangler deploy --minify"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.5.2",

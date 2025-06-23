@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
-fetch('/api/hello')
+fetch('/api/rss/hello')
   .then(response => response.json())
   .then(data => console.log(data))
   .catch(error => console.error('Error fetching data:', error));

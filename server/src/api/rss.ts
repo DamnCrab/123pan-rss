@@ -16,7 +16,7 @@ const rssSchema = z.object({
 app.post('/', zValidator('json', rssSchema), async (c) => {
     const { url } = c.req.valid('json')
     const user = c.get('jwtPayload') // 从JWT中间件获取用户信息
-    
+
     return c.json({
         message: 'RSS订阅添加成功',
         url,
@@ -27,13 +27,13 @@ app.post('/', zValidator('json', rssSchema), async (c) => {
 // 获取RSS订阅列表
 app.get('/', async (c) => {
     const user = c.get('jwtPayload')
-    
+
     // 这里应该从数据库获取用户的RSS订阅
     const mockRssFeeds = [
         { id: 1, url: 'https://example.com/rss1.xml', title: 'Example RSS 1' },
         { id: 2, url: 'https://example.com/rss2.xml', title: 'Example RSS 2' }
     ]
-    
+
     return c.json({
         message: '获取RSS订阅列表成功',
         feeds: mockRssFeeds,
@@ -45,11 +45,16 @@ app.get('/', async (c) => {
 app.delete('/:id', async (c) => {
     const id = c.req.param('id')
     const user = c.get('jwtPayload')
-    
+
     return c.json({
         message: `RSS订阅 ${id} 删除成功`,
         userId: user.id
     })
+})
+
+// hello world 路由
+app.get('/hello', (c) => {
+    return c.json({ message: 'Hello, RSS API!' })
 })
 
 export default app
