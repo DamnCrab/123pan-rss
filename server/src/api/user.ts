@@ -3,7 +3,9 @@ import {sign, verify} from 'hono/jwt'
 import {z} from 'zod'
 import "zod-openapi/extend";
 import {describeRoute} from "hono-openapi";
-import {resolver, validator as zValidator } from "hono-openapi/zod";
+import {resolver, validator as zValidator} from "hono-openapi/zod";
+import * as schema from '../db/schema';
+import {db} from "../db";
 
 const app = new Hono()
 
@@ -42,9 +44,9 @@ app.post('/login',
         summary: '用户登录',
         description: '使用用户名和密码进行登录，成功后返回JWT token',
         responses: {
-            200:{
-                description : '登录成功',
-                content:{
+            200: {
+                description: '登录成功',
+                content: {
                     'application/json': {
                         schema: resolver(responseSchema)
                     }
@@ -110,6 +112,17 @@ app.get('/profile', async (c) => {
         return c.json({error: 'token无效或已过期'}, 401)
     }
 })
+
+// hello world 路由
+app.get('/hello', async (c) => {
+    try {
+        const users = await db(c.env).select().from(schema.usersTable)
+        return c.json({message: 'Hello World', users})
+    } catch (e) {
+        console.log(e)
+    }
+})
+
 
 export default app
 export {JWT_SECRET}

@@ -2,13 +2,26 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "123pan-rss",
   "main": "src/index.ts",
-  "compatibility_date": "2025-06-23",
+  "compatibility_date": "2025-06-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+//  "env": {
+//    "dev": {
+//      "vars": {
+//        "ENVIRONMENT": "development"
+//      }
+//    }
+//  },
   "dev": {
     "port": 8787
   },
   "assets": {
     "directory": "../client/dist"
-  }
+  },
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
