@@ -1,16 +1,43 @@
 import {Hono} from 'hono'
-import {sign, verify} from 'hono/jwt'
+import {sign} from 'hono/jwt'
 import {z} from 'zod'
 import "zod-openapi/extend";
 import {describeRoute} from "hono-openapi";
-import {resolver, validator as zValidator} from "hono-openapi/zod";
-import * as schema from '../db/schema';
+import { validator as zValidator} from "hono-openapi/zod";
 import {db} from "../db";
+import {eq} from 'drizzle-orm';
+import {setCookie} from 'hono/cookie';
+import {hashPassword, JWT_SECRET, jwtMiddleware, signUserJwt, verifyPassword} from '../middleware/jwt';
+import {usersTable} from "../db/schema";
+import {responseSchema, successResponseSchema} from "../utils/responseSchema";
 
 const app = new Hono()
 
-// JWT密钥 - 在生产环境中应该使用环境变量
-const JWT_SECRET = 'your-secret-key'
+
+
+// 初始化默认用户
+async function initDefaultUser(env: any) {
+    try {
+        const database = db(env);
+        // 检查是否已存在admin用户
+        const existingAdmin = await database.select().from(usersTable)
+            .where(eq(usersTable.username, 'admin')).limit(1);
+
+        if (existingAdmin.length === 0) {
+            // 对默认密码进行哈希处理
+            const hashedPassword = await hashPassword('admin123');
+
+            // 创建默认admin用户
+            await database.insert(usersTable).values({
+                username: 'admin',
+                password: hashedPassword
+            });
+            console.log('默认admin用户已创建');
+        }
+    } catch (error) {
+        console.error('初始化默认用户失败:', error);
+    }
+}
 
 // 登录请求验证schema
 const loginSchema = z.object({
@@ -24,105 +51,66 @@ const loginSchema = z.object({
     }
 })
 
-const responseSchema = z.object({
-    code: z.number(),
-    message: z.string(),
-}).openapi({
-    ref: 'Response',
-})
-
-// 模拟用户数据 - 在实际项目中应该连接数据库
-const users = [
-    {id: 1, username: 'admin', password: 'admin123'},
-    {id: 2, username: 'user', password: 'user123'}
-]
-
 // 登录接口
 app.post('/login',
     describeRoute({
         tags: ['User'],
         summary: '用户登录',
         description: '使用用户名和密码进行登录，成功后返回JWT token',
-        responses: {
-            200: {
-                description: '登录成功',
-                content: {
-                    'application/json': {
-                        schema: resolver(responseSchema)
-                    }
-                }
-            }
-        }
+        responses: responseSchema()
     }),
     zValidator('json', loginSchema), async (c) => {
         const {username, password} = c.req.valid('json')
 
-        // 验证用户凭据
-        const user = users.find(u => u.username === username && u.password === password)
+        // 初始化默认用户
+        await initDefaultUser(c.env);
 
-        if (!user) {
-            return c.json({error: '用户名或密码错误'}, 401)
-        }
+        try {
+            const database = db(c.env);
+            // 从数据库验证用户凭据
+            const users = await database.select().from(usersTable)
+                .where(eq(usersTable.username, username)).limit(1);
 
-        // 生成JWT token
-        const payload = {
-            id: user.id,
-            username: user.username,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24小时过期
-        }
-
-        const token = await sign(payload, JWT_SECRET)
-
-        return c.json({
-            message: '登录成功',
-            token,
-            user: {
-                id: user.id,
-                username: user.username
+            const user = users[0];
+            if (!user || !(await verifyPassword(password, user.password))) {
+                return c.json({error: '用户名或密码错误'}, 401)
             }
-        })
+
+            const token = await signUserJwt(user);
+
+            // 将JWT存储到cookie中
+            setCookie(c, 'auth_token', token, {
+                httpOnly: true,
+                secure: false, // 在生产环境中应设为true
+                sameSite: 'Lax',
+                maxAge: 60 * 60 * 24 // 24小时
+            });
+
+            return c.json({
+                message: '登录成功',
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username
+                }
+            })
+        } catch (error) {
+            console.error('登录错误:', error);
+            return c.json({error: '服务器内部错误'}, 500)
+        }
     })
 
 // 登出接口
 app.post('/logout', async (c) => {
-    // 在客户端删除token即可实现登出
-    // 这里可以添加token黑名单逻辑
+    // 清除cookie中的JWT token
+    setCookie(c, 'auth_token', '', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax',
+        maxAge: 0 // 立即过期
+    });
+
     return c.json({message: '登出成功'})
 })
 
-// 获取当前用户信息接口（需要JWT验证）
-app.get('/profile', async (c) => {
-    const authHeader = c.req.header('Authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json({error: '未提供有效的认证token'}, 401)
-    }
-
-    const token = authHeader.substring(7)
-
-    try {
-        const payload = await verify(token, JWT_SECRET)
-        return c.json({
-            user: {
-                id: payload.id,
-                username: payload.username
-            }
-        })
-    } catch (error) {
-        return c.json({error: 'token无效或已过期'}, 401)
-    }
-})
-
-// hello world 路由
-app.get('/hello', async (c) => {
-    try {
-        const users = await db(c.env).select().from(schema.usersTable)
-        return c.json({message: 'Hello World', users})
-    } catch (e) {
-        console.log(e)
-    }
-})
-
-
 export default app
-export {JWT_SECRET}
