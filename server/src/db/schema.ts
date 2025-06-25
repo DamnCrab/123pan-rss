@@ -1,4 +1,4 @@
-import { sqliteTable, text, int } from "drizzle-orm/sqlite-core";
+import {int, sqliteTable, text} from "drizzle-orm/sqlite-core";
 
 export const usersTable = sqliteTable("users_table", {
     id: int().primaryKey({ autoIncrement: true }),
@@ -18,4 +18,15 @@ export const rssSubscriptionsTable = sqliteTable("rss_subscriptions", {
     lastRefresh: text(), // 最后刷新时间
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
+});
+
+export const magnetLinksTable = sqliteTable("magnet_links", {
+    id: int().primaryKey({ autoIncrement: true }),
+    rssSubscriptionId: int().notNull().references(() => rssSubscriptionsTable.id),
+    title: text().notNull(), // 种子标题
+    magnetLink: text().notNull().unique(), // 磁力链接，确保不重复
+    pubDate: text(), // 发布时间
+    description: text(), // 描述
+    size: text(), // 文件大小
+    createdAt: text().notNull(),
 });

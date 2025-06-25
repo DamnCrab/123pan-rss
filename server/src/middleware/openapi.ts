@@ -25,6 +25,10 @@ const openapi = (app: Hono<BlankEnv, BlankSchema, "/">) => {
                             url: "http://localhost:8787",
                             description: "Local server",
                         },
+                        {
+                            url:"https://123pan-rss.enormouscrab.workers.dev/",
+                            description: "Production server",
+                        }
                     ],
                 },
             })

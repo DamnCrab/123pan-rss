@@ -91,6 +91,7 @@ app.post('/',
                 refreshInterval: data.refreshInterval!,
                 refreshUnit: data.refreshUnit || 'minutes',
                 isActive: data.isActive !== undefined ? (data.isActive ? 1 : 0) : 1,
+                lastRefresh: null,
                 createdAt: now,
                 updatedAt: now
             }).returning()

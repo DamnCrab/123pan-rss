@@ -6,7 +6,8 @@ import { D1Helper } from "@nerdfolio/drizzle-d1-helpers";
 // 好麻烦 需要切配置来运行drizzle
 
 const crawledDbHelper = D1Helper.get("db_123");
-const isProd = () => process.env.NODE_ENV === 'production'
+const updateProd = false
+const isProd = () => process.env.NODE_ENV === 'production' || updateProd
 
 const getCredentials = () => {
     const prod = {
