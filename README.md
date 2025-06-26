@@ -4,19 +4,42 @@
 
 使用hono和vue构建，只适用于cloudflare workers。目的是定时拉取rss并使用123云盘离线下载能力自动保存到123云盘。
 
-WIP
+## 进度
+
+- [x] 基础功能
+- [x] 123云盘离线下载
+- [ ] 123云盘离线下载状态查询
+- [ ] 前端页面
+
+vibe coding一时爽 一直vibe coding一直爽
 
 ## 部署
 
 ### 需要配置的变量
 
+#### 在cloudflare workers中需要创建的环境变量
 
-| 环境变量               | 描述              | 示例       |
-| ---------------------- | ----------------- | ---------- |
+| 环境变量                   | 描述        | 示例         |
+|------------------------|-----------|------------|
 | `ENVIRONMENT`          | 开发环境/本地环境 | production |
-| `pan123_client_id`     | 123云盘申请       |            |
-| `pan123_client_secret` | 123云盘申请       |            |
-|                        |                   |            |
+| `pan123_client_id`     | 123云盘申请   |            |
+| `pan123_client_secret` | 123云盘申请   |            |
+|                        |           |            |
+
+#### 在本地wrangler.jsonc中需要配置的环境变量
+
+项目中有多处`db_123`需要替换成数据库名称
+
+```.jsonc
+"d1_databases": [
+    {
+        "binding": "database",
+        "database_name": "数据库名称",
+        "database_id": "数据库id",
+        "migrations_dir": "drizzle/migrations"
+    }
+  ],
+```
 
 本地开发时，建议使用 `.dev.vars` 文件来配置这些变量。可以在项目根目录下创建一个 `.env` 文件，并添加以下内容：
 
@@ -28,16 +51,17 @@ pan123_client_secret=your_client_secret
 
 ### 定时任务
 
-配置触发事件为scheduled() 
+配置触发事件为scheduled()
 
 建议20分钟 */20 * * * *
 
 ## 开发
 
 ### 数据库
+
 本项目使用 Drizzle ORM 进行数据库操作。可以通过 `drizzle:generate` 命令生成数据库模型，并使用 `drizzle:migrate` 命令执行数据库迁移。
 
-需要本地创建`.env` 文件，并添加以下内容方便连接线上数据库：
+本地调试时可以创建`.env` 文件，并添加以下内容方便连接线上数据库：
 
 ```.env
 CLOUDFLARE_ACCOUNT_ID=

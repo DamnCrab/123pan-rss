@@ -21,8 +21,9 @@ export const rssSubscriptionsTable = sqliteTable("rss_subscriptions", {
     id: int().primaryKey({ autoIncrement: true }),
     userId: int().notNull().references(() => usersTable.id),
     rssUrl: text().notNull(),
-    folderPath: text().notNull(),
+    folderPath: text().notNull(), // 父文件夹ID（123云盘中的文件夹ID）
     folderName: text().notNull(),
+    cloudFolderId: text(), // 在123云盘中创建的文件夹ID
     refreshInterval: int().notNull(), // 刷新间隔，单位：分钟
     refreshUnit: text().notNull().default('minutes'), // 'minutes' 或 'hours'
     isActive: int().notNull().default(1), // 1: 激活, 0: 停用

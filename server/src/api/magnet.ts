@@ -269,14 +269,21 @@ export async function processOfflineDownloads(env: any) {
     try {
         // 1. 创建新的离线下载任务（状态为pending的磁链）
         const pendingMagnets = await database
-            .select()
+            .select({
+                magnet: magnetLinksTable,
+                rss: rssSubscriptionsTable
+            })
             .from(magnetLinksTable)
+            .innerJoin(rssSubscriptionsTable, eq(magnetLinksTable.rssSubscriptionId, rssSubscriptionsTable.id))
             .where(eq(magnetLinksTable.downloadStatus, 'pending'))
             .limit(10) // 限制每次处理的数量
         
         console.log(`找到 ${pendingMagnets.length} 个待下载的磁力链接`)
         
-        for (const magnet of pendingMagnets) {
+        for (const item of pendingMagnets) {
+            const magnet = item.magnet;
+            const rss = item.rss;
+            
             try {
                 // 构建回调URL（需要根据实际部署环境调整）
                 const callBackUrl = `${env.CALLBACK_BASE_URL || 'https://your-domain.com'}/api/cloud123/offline/callback`
@@ -284,6 +291,7 @@ export async function processOfflineDownloads(env: any) {
                 const result = await createOfflineDownload(env, {
                     url: magnet.magnetLink,
                     fileName: magnet.title,
+                    dirID: rss.cloudFolderId ? parseInt(rss.cloudFolderId) : undefined,
                     callBackUrl: callBackUrl
                 })
                 
@@ -470,7 +478,22 @@ app.get('/list',
             const offset = (pageNum - 1) * pageSize
 
             // 构建基础查询
-            let baseQuery = database
+            // 构建where条件数组
+            const whereConditions = [];
+            
+            // 添加条件筛选
+            if (rssId) {
+                const rssIdNum = parseInt(rssId)
+                if (isNaN(rssIdNum)) {
+                    return c.json({
+                        success: false,
+                        message: 'rssId参数必须是有效的数字'
+                    }, 400)
+                }
+                whereConditions.push(eq(magnetLinksTable.rssSubscriptionId, rssIdNum));
+            }
+
+            const baseQuery = database
                 .select({
                     id: magnetLinksTable.id,
                     title: magnetLinksTable.title,
@@ -492,18 +515,7 @@ app.get('/list',
                     downloadCompletedAt: magnetLinksTable.downloadCompletedAt
                 })
                 .from(magnetLinksTable)
-
-            // 添加条件筛选
-            if (rssId) {
-                const rssIdNum = parseInt(rssId)
-                if (isNaN(rssIdNum)) {
-                    return c.json({
-                        success: false,
-                        message: 'rssId参数必须是有效的数字'
-                    }, 400)
-                }
-                baseQuery = baseQuery.where(eq(magnetLinksTable.rssSubscriptionId, rssIdNum))
-            }
+                .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
 
             // 执行查询
             const magnetLinks = await baseQuery

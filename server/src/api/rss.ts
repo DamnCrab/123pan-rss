@@ -7,6 +7,7 @@ import {jwtMiddleware} from '../middleware/jwt'
 import {db} from "../db";
 import {eq, and, like, SQL} from 'drizzle-orm';
 import {rssSubscriptionsTable} from "../db/schema";
+import {createFolder} from "./cloud123";
 import {responseSchema} from "../utils/responseSchema";
 
 const app = new Hono()
@@ -102,11 +103,25 @@ app.post('/',
 
             const now = Date.now()
 
+            // 在123云盘中创建文件夹
+            const folderResult = await createFolder(c.env, {
+                name: data.folderName!,
+                parentID: parseInt(data.folderPath!)
+            });
+
+            if (!folderResult) {
+                return c.json({
+                    success: false,
+                    message: '创建123云盘文件夹失败'
+                }, 500)
+            }
+
             const [newSubscription] = await database.insert(rssSubscriptionsTable).values({
                 userId: user.id,
                 rssUrl: data.rssUrl!,
                 folderPath: data.folderPath!,
                 folderName: data.folderName!,
+                cloudFolderId: folderResult.dirID.toString(),
                 refreshInterval: data.refreshInterval!,
                 refreshUnit: data.refreshUnit || 'minutes',
                 isActive: data.isActive !== undefined ? (data.isActive ? 1 : 0) : 1,

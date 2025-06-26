@@ -5,7 +5,7 @@ import { D1Helper } from "@nerdfolio/drizzle-d1-helpers";
 // https://github.com/drizzle-team/drizzle-orm/discussions/1545#discussioncomment-13372294
 // 好麻烦 需要切配置来运行drizzle
 
-const crawledDbHelper = D1Helper.get("db_123");
+const crawledDbHelper = D1Helper.get("database");
 const updateProd = false // 设置为true可以在本地测试时使用生产环境的配置
 const isProd = () => process.env.NODE_ENV === 'production' || updateProd
 

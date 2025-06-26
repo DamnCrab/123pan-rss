@@ -4,8 +4,8 @@ import 'zod-openapi/extend';
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { db } from "../db";
-import { eq, inArray } from 'drizzle-orm';
-import { cloudTokenTable, magnetLinksTable } from "../db/schema";
+import { eq, inArray, and } from 'drizzle-orm';
+import { cloudTokenTable, magnetLinksTable, rssSubscriptionsTable } from "../db/schema";
 import { responseSchema } from "../utils/responseSchema";
 import { jwtMiddleware } from '../middleware/jwt';
 
@@ -501,6 +501,47 @@ export async function createOfflineDownload(env: any, params: {
     }
 }
 
+// 创建文件夹
+export async function createFolder(env: any, params: {
+    name: string;
+    parentID: number;
+}): Promise<{ dirID: number } | null> {
+    const accessToken = await getAccessToken(env);
+    if (!accessToken) {
+        throw new Error('无法获取access_token');
+    }
+
+    try {
+        const response = await fetch('https://open-api.123pan.com/upload/v1/file/mkdir', {
+            method: 'POST',
+            headers: {
+                'Platform': 'open_platform',
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({
+                name: params.name,
+                parentID: params.parentID
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`创建文件夹失败: ${response.status}`);
+        }
+
+        const data = await response.json() as pan123Response;
+
+        if (data.code !== 0) {
+            throw new Error(`创建文件夹失败: ${data.message}`);
+        }
+
+        return { dirID: data.data.dirID };
+    } catch (error) {
+        console.error('创建文件夹失败:', error);
+        return null;
+    }
+}
+
 // 获取离线下载进度
 export async function getOfflineDownloadProgress(env: any, taskID: string): Promise<{
     status: number;
@@ -545,84 +586,119 @@ export async function getOfflineDownloadProgress(env: any, taskID: string): Prom
     }
 }
 
+// 批量重试请求schema
+const retryRequestSchema = z.object({
+    magnetIds: z.array(z.number()).optional().describe('要重试的磁力链接ID列表'),
+    rssSubscriptionIds: z.array(z.number()).optional().describe('要重试的RSS订阅ID列表，将重试该订阅下所有失败的任务')
+}).openapi({
+    ref: 'RetryRequest',
+    example: {
+        magnetIds: [1, 2, 3],
+        rssSubscriptionIds: [1, 2]
+    }
+});
+
+// 重试结果详情schema
+const retryDetailSchema = z.object({
+    id: z.number().describe('磁力链接ID'),
+    title: z.string().describe('磁力链接标题'),
+    success: z.boolean().describe('是否重试成功'),
+    error: z.string().optional().describe('错误信息')
+}).openapi({
+    ref: 'RetryDetail',
+    example: {
+        id: 1,
+        title: '示例磁力链接',
+        success: true
+    }
+});
+
+// 重试结果响应schema
+const retryResponseSchema = z.object({
+    total: z.number().describe('总共重试的任务数'),
+    success: z.number().describe('成功创建的任务数'),
+    failed: z.number().describe('创建失败的任务数'),
+    details: z.array(retryDetailSchema).describe('重试详情列表')
+}).openapi({
+    ref: 'RetryResponse',
+    example: {
+        total: 3,
+        success: 2,
+        failed: 1,
+        details: [
+            {
+                id: 1,
+                title: '示例磁力链接1',
+                success: true
+            },
+            {
+                id: 2,
+                title: '示例磁力链接2',
+                success: false,
+                error: '创建下载任务失败'
+            }
+        ]
+    }
+});
+
 // 批量重试下载失败的任务
 app.post('/offline/retry',
     describeRoute({
-        summary: '批量重试下载失败的任务',
-        description: '重新创建下载失败的离线下载任务',
         tags: ['123云盘'],
-        requestBody: {
-            content: {
-                'application/json': {
-                    schema: {
-                        type: 'object',
-                        properties: {
-                            magnetIds: {
-                                type: 'array',
-                                items: { type: 'number' },
-                                description: '要重试的磁力链接ID列表，如果不提供则重试所有失败的任务'
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        responses: {
-            200: {
-                description: '重试结果',
-                content: {
-                    'application/json': {
-                        schema: {
-                            type: 'object',
-                            properties: {
-                                success: { type: 'boolean' },
-                                message: { type: 'string' },
-                                data: {
-                                    type: 'object',
-                                    properties: {
-                                        total: { type: 'number', description: '总共重试的任务数' },
-                                        success: { type: 'number', description: '成功创建的任务数' },
-                                        failed: { type: 'number', description: '创建失败的任务数' },
-                                        details: {
-                                            type: 'array',
-                                            items: {
-                                                type: 'object',
-                                                properties: {
-                                                    id: { type: 'number' },
-                                                    title: { type: 'string' },
-                                                    success: { type: 'boolean' },
-                                                    error: { type: 'string' }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        summary: '批量重试下载失败的任务',
+        description: '重新创建下载失败的离线下载任务。如果magnetIds和rssSubscriptionIds都不提供，则重试所有失败的任务',
+        security: [{bearerAuth: []}],
+        responses: responseSchema(retryResponseSchema)
     }),
+    zValidator('json', retryRequestSchema),
     async (c) => {
         try {
-            const body = await c.req.json().catch(() => ({}));
-            const { magnetIds } = body;
+            const { magnetIds, rssSubscriptionIds } = c.req.valid('json');
 
             const database = db(c.env);
 
             // 构建查询条件
-            let query = database
-                .select()
-                .from(magnetLinksTable)
-                .where(eq(magnetLinksTable.downloadStatus, 'failed'));
-
-            // 如果提供了特定的ID列表，则只重试这些任务
+            // 构建where条件数组
+            const whereConditions = [eq(magnetLinksTable.downloadStatus, 'failed')];
+            
+            // 如果提供了特定的磁力链接ID列表，则只重试这些任务
             if (magnetIds && Array.isArray(magnetIds) && magnetIds.length > 0) {
-                query = query.where(inArray(magnetLinksTable.id, magnetIds));
+                whereConditions.push(inArray(magnetLinksTable.id, magnetIds));
+            }
+            // 如果提供了RSS订阅ID列表，则重试这些订阅下的所有失败任务
+            else if (rssSubscriptionIds && Array.isArray(rssSubscriptionIds) && rssSubscriptionIds.length > 0) {
+                whereConditions.push(inArray(magnetLinksTable.rssSubscriptionId, rssSubscriptionIds));
             }
 
-            const failedTasks = await query;
+            const query = database
+                .select()
+                .from(magnetLinksTable)
+                .where(and(...whereConditions));
+
+            // 需要JOIN查询获取RSS订阅信息以获取cloudFolderId
+            // 构建where条件数组
+            const joinWhereConditions = [eq(magnetLinksTable.downloadStatus, 'failed')];
+            
+            // 根据条件添加额外的where子句
+            if (magnetIds && Array.isArray(magnetIds) && magnetIds.length > 0) {
+                joinWhereConditions.push(inArray(magnetLinksTable.id, magnetIds));
+            } else if (rssSubscriptionIds && Array.isArray(rssSubscriptionIds) && rssSubscriptionIds.length > 0) {
+                joinWhereConditions.push(inArray(magnetLinksTable.rssSubscriptionId, rssSubscriptionIds));
+            }
+
+            const failedTasksQuery = database
+                .select({
+                    magnet: magnetLinksTable,
+                    rss: rssSubscriptionsTable
+                })
+                .from(magnetLinksTable)
+                .innerJoin(rssSubscriptionsTable, eq(magnetLinksTable.rssSubscriptionId, rssSubscriptionsTable.id))
+                .where(and(...joinWhereConditions));
+
+            const failedTasksWithRss = await failedTasksQuery;
+
+            const failedTasks = failedTasksWithRss.map(item => item.magnet);
+            const rssMap = new Map(failedTasksWithRss.map(item => [item.magnet.id, item.rss]));
 
             if (failedTasks.length === 0) {
                 return c.json({
@@ -667,10 +743,14 @@ app.post('/offline/retry',
                         })
                         .where(eq(magnetLinksTable.id, task.id));
 
+                    // 获取对应的RSS订阅信息
+                    const rssInfo = rssMap.get(task.id);
+                    
                     // 创建新的离线下载任务
                     const result = await createOfflineDownload(c.env, {
                         url: task.magnetLink,
                         fileName: task.title,
+                        dirID: rssInfo?.cloudFolderId ? parseInt(rssInfo.cloudFolderId) : undefined,
                         callBackUrl: `${c.req.url.split('/api')[0]}/api/offline/callback`
                     });
 
@@ -737,17 +817,42 @@ app.post('/offline/retry',
     }
 );
 
+// 离线下载回调请求schema
+const callbackRequestSchema = z.object({
+    url: z.string().describe('磁力链接URL'),
+    status: z.number().describe('下载状态，0表示成功，1表示失败'),
+    failReason: z.string().optional().describe('失败原因'),
+    fileID: z.string().optional().describe('下载成功后的文件ID')
+}).openapi({
+    ref: 'CallbackRequest',
+    example: {
+        url: 'magnet:?xt=urn:btih:example',
+        status: 0,
+        fileID: '123456'
+    }
+});
+
 // 离线下载回调接口
 app.post('/offline/callback',
     describeRoute({
-        summary: '离线下载回调接口',
-        description: '123云盘离线下载完成后的回调接口',
         tags: ['123云盘'],
+        summary: '离线下载回调接口',
+        description: '123云盘离线下载完成后的回调接口，用于更新下载状态',
+        responses: responseSchema(z.object({
+            success: z.boolean(),
+            message: z.string()
+        }).openapi({
+            ref: 'CallbackResponse',
+            example: {
+                success: true,
+                message: '回调处理成功'
+            }
+        }))
     }),
+    zValidator('json', callbackRequestSchema),
     async (c) => {
         try {
-            const body = await c.req.json();
-            const { url, status, failReason, fileID } = body;
+            const { url, status, failReason, fileID } = c.req.valid('json');
 
             console.log('收到离线下载回调:', { url, status, failReason, fileID });
 
