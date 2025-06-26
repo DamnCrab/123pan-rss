@@ -43,4 +43,11 @@ export const magnetLinksTable = sqliteTable("magnet_links", {
     description: text(), // 描述
     size: text(), // 文件大小
     createdAt: int().notNull(), // 创建时间 (时间戳)
+    // 离线下载相关字段
+    downloadTaskId: text(), // 123云盘离线下载任务ID
+    downloadStatus: text().default('pending'), // 下载状态: pending, downloading, completed, failed
+    downloadFileId: text(), // 下载完成后的文件ID
+    downloadFailReason: text(), // 下载失败原因
+    downloadCreatedAt: int(), // 创建下载任务时间
+    downloadCompletedAt: int(), // 下载完成时间
 });

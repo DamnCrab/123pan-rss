@@ -8,6 +8,7 @@ import { eq, and, gt } from 'drizzle-orm'
 import { rssSubscriptionsTable, magnetLinksTable } from '../db/schema'
 import { responseSchema } from '../utils/responseSchema'
 import { XMLParser } from 'fast-xml-parser'
+import { createOfflineDownload, getOfflineDownloadProgress } from './cloud123'
 
 const app = new Hono()
 
@@ -23,7 +24,14 @@ const magnetLinkSchema = z.object({
     pubDate: z.number().nullable().describe('发布时间 (时间戳)'),
     description: z.string().nullable().describe('描述信息'),
     size: z.string().nullable().describe('文件大小'),
-    createdAt: z.number().describe('创建时间 (时间戳)')
+    createdAt: z.number().describe('创建时间 (时间戳)'),
+    // 离线下载相关字段
+    downloadTaskId: z.string().nullable().describe('123云盘离线下载任务ID'),
+    downloadStatus: z.string().describe('下载状态: pending, downloading, completed, failed'),
+    downloadFileId: z.string().nullable().describe('下载完成后的文件ID'),
+    downloadFailReason: z.string().nullable().describe('下载失败原因'),
+    downloadCreatedAt: z.number().nullable().describe('创建下载任务时间'),
+    downloadCompletedAt: z.number().nullable().describe('下载完成时间')
 }).openapi({
     ref: 'MagnetLink',
     example: {
@@ -37,7 +45,13 @@ const magnetLinkSchema = z.object({
         pubDate: 1704067200000,
         description: '动漫描述',
         size: '500MB',
-        createdAt: 1704067200000
+        createdAt: 1704067200000,
+        downloadTaskId: 'task_123456',
+        downloadStatus: 'completed',
+        downloadFileId: 'file_789012',
+        downloadFailReason: null,
+        downloadCreatedAt: 1704067200000,
+        downloadCompletedAt: 1704070800000
     }
 })
 
@@ -238,10 +252,131 @@ export async function processRSSFeeds(env: any) {
                 .where(eq(rssSubscriptionsTable.id, subscription.id))
         }
 
+        // 处理离线下载任务
+        await processOfflineDownloads(env)
+        
         console.log('RSS定时任务处理完成')
     } catch (error) {
         console.error('RSS定时任务处理失败:', error)
         throw error
+    }
+}
+
+// 处理离线下载任务
+export async function processOfflineDownloads(env: any) {
+    const database = db(env)
+    
+    try {
+        // 1. 创建新的离线下载任务（状态为pending的磁链）
+        const pendingMagnets = await database
+            .select()
+            .from(magnetLinksTable)
+            .where(eq(magnetLinksTable.downloadStatus, 'pending'))
+            .limit(10) // 限制每次处理的数量
+        
+        console.log(`找到 ${pendingMagnets.length} 个待下载的磁力链接`)
+        
+        for (const magnet of pendingMagnets) {
+            try {
+                // 构建回调URL（需要根据实际部署环境调整）
+                const callBackUrl = `${env.CALLBACK_BASE_URL || 'https://your-domain.com'}/api/cloud123/offline/callback`
+                
+                const result = await createOfflineDownload(env, {
+                    url: magnet.magnetLink,
+                    fileName: magnet.title,
+                    callBackUrl: callBackUrl
+                })
+                
+                if (result && result.taskID) {
+                    // 更新任务状态
+                    await database
+                        .update(magnetLinksTable)
+                        .set({
+                            downloadTaskId: result.taskID,
+                            downloadStatus: 'downloading',
+                            downloadCreatedAt: Date.now()
+                        })
+                        .where(eq(magnetLinksTable.id, magnet.id))
+                    
+                    console.log(`创建离线下载任务成功: ${magnet.title} -> ${result.taskID}`)
+                } else {
+                    // 创建失败，标记为失败状态
+                    await database
+                        .update(magnetLinksTable)
+                        .set({
+                            downloadStatus: 'failed',
+                            downloadFailReason: '创建下载任务失败'
+                        })
+                        .where(eq(magnetLinksTable.id, magnet.id))
+                    
+                    console.log(`创建离线下载任务失败: ${magnet.title}`)
+                }
+            } catch (error) {
+                console.error(`处理磁力链接 ${magnet.id} 失败:`, error)
+                
+                // 标记为失败状态
+                await database
+                    .update(magnetLinksTable)
+                    .set({
+                        downloadStatus: 'failed',
+                        downloadFailReason: error instanceof Error ? error.message : '未知错误'
+                    })
+                    .where(eq(magnetLinksTable.id, magnet.id))
+            }
+        }
+        
+        // 2. 检查正在下载的任务状态
+        const downloadingMagnets = await database
+            .select()
+            .from(magnetLinksTable)
+            .where(eq(magnetLinksTable.downloadStatus, 'downloading'))
+        
+        console.log(`检查 ${downloadingMagnets.length} 个正在下载的任务状态`)
+        
+        for (const magnet of downloadingMagnets) {
+            if (!magnet.downloadTaskId) continue
+            
+            try {
+                const progress = await getOfflineDownloadProgress(env, magnet.downloadTaskId)
+                
+                if (progress) {
+                    const now = Date.now()
+                    
+                    if (progress.status === 0) {
+                        // 下载成功
+                        await database
+                            .update(magnetLinksTable)
+                            .set({
+                                downloadStatus: 'completed',
+                                downloadFileId: progress.fileID,
+                                downloadCompletedAt: now
+                            })
+                            .where(eq(magnetLinksTable.id, magnet.id))
+                        
+                        console.log(`下载完成: ${magnet.title} -> ${progress.fileID}`)
+                    } else if (progress.status === 1) {
+                        // 下载失败
+                        await database
+                            .update(magnetLinksTable)
+                            .set({
+                                downloadStatus: 'failed',
+                                downloadFailReason: progress.failReason || '下载失败',
+                                downloadCompletedAt: now
+                            })
+                            .where(eq(magnetLinksTable.id, magnet.id))
+                        
+                        console.log(`下载失败: ${magnet.title} -> ${progress.failReason}`)
+                    }
+                    // status === 2 表示仍在下载中，保持当前状态
+                }
+            } catch (error) {
+                console.error(`检查下载状态失败 ${magnet.id}:`, error)
+            }
+        }
+        
+        console.log('离线下载任务处理完成')
+    } catch (error) {
+        console.error('处理离线下载任务失败:', error)
     }
 }
 
@@ -340,11 +475,21 @@ app.get('/list',
                     id: magnetLinksTable.id,
                     title: magnetLinksTable.title,
                     magnetLink: magnetLinksTable.magnetLink,
+                    webLink: magnetLinksTable.webLink,
+                    author: magnetLinksTable.author,
+                    category: magnetLinksTable.category,
                     pubDate: magnetLinksTable.pubDate,
                     description: magnetLinksTable.description,
                     size: magnetLinksTable.size,
                     createdAt: magnetLinksTable.createdAt,
-                    rssSubscriptionId: magnetLinksTable.rssSubscriptionId
+                    rssSubscriptionId: magnetLinksTable.rssSubscriptionId,
+                    // 离线下载相关字段
+                    downloadTaskId: magnetLinksTable.downloadTaskId,
+                    downloadStatus: magnetLinksTable.downloadStatus,
+                    downloadFileId: magnetLinksTable.downloadFileId,
+                    downloadFailReason: magnetLinksTable.downloadFailReason,
+                    downloadCreatedAt: magnetLinksTable.downloadCreatedAt,
+                    downloadCompletedAt: magnetLinksTable.downloadCompletedAt
                 })
                 .from(magnetLinksTable)
 
