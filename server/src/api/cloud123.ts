@@ -254,6 +254,8 @@ export async function getFileList(env: any, params: {
     }
     if (params.trashed !== undefined) {
         queryParams.append('trashed', params.trashed.toString());
+    } else {
+        queryParams.append('trashed', 'false'); // 默认不查看回收站
     }
     if (params.searchMode !== undefined) {
         queryParams.append('searchMode', params.searchMode.toString());
@@ -294,8 +296,8 @@ app.post('/config',
     }),
     async (c) => {
         try {
-            // const { clientId, clientSecret } = c.req.valid('json');
             const env = c.env as Cloudflare.Env;
+            console.log(env)
 
             const accessToken = await getAccessToken(env, env.pan123_client_id, env.pan123_client_secret);
 

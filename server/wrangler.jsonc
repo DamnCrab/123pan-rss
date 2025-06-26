@@ -7,15 +7,17 @@
     "nodejs_compat"
   ],
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    "pan123_client_id":"",
+    "pan123_client_secret":""
   },
-//  "env": {
-//    "dev": {
-//      "vars": {
-//        "ENVIRONMENT": "development"
-//      }
-//    }
-//  },
+  //  "env": {
+  //    "dev": {
+  //      "vars": {
+  //        "ENVIRONMENT": "development"
+  //      }
+  //    }
+  //  },
   "dev": {
     "port": 8787
   },
@@ -25,9 +27,6 @@
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -40,13 +39,24 @@
   //     "bucket_name": "my-bucket"
   //   }
   // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
+  "d1_databases": [
+    {
+      "binding": "",
+      "database_name": "",
+      "database_id": "",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  },
+  "triggers": {
+    "crons": [
+      "*/20 * * * *"
+    ]
+  }
   // "ai": {
   //   "binding": "AI"
   // },

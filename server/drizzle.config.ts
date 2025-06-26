@@ -6,7 +6,7 @@ import { D1Helper } from "@nerdfolio/drizzle-d1-helpers";
 // 好麻烦 需要切配置来运行drizzle
 
 const crawledDbHelper = D1Helper.get("db_123");
-const updateProd = false
+const updateProd = false // 设置为true可以在本地测试时使用生产环境的配置
 const isProd = () => process.env.NODE_ENV === 'production' || updateProd
 
 const getCredentials = () => {
@@ -34,15 +34,3 @@ export default defineConfig({
     dialect: "sqlite",
     ...getCredentials()
 });
-
-// export default defineConfig({
-//     out: './drizzle',
-//     schema: './src/db/schema.ts',
-//     dialect: 'sqlite',
-//     driver: 'd1-http',
-//     dbCredentials: {
-//         accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
-//         databaseId: process.env.CLOUDFLARE_DATABASE_ID!,
-//         token: process.env.CLOUDFLARE_D1_TOKEN!,
-//     },
-// });
