@@ -3,7 +3,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:remote": "wrangler dev --remote",
-    "deploy": "wrangler deploy --minify",
+    "deploy": "wrangler deploy --minify --config wrangler.prod.jsonc",
     "build-frontend": "cd ../client && bun install && bun run build",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "deploy-with-frontend": "npm run build-frontend && wrangler deploy --minify",

@@ -33,3 +33,4 @@ lerna-debug.log*
 .DS_Store
 wrangler.jsonc
 drizzle
+wrangler.prod.jsonc

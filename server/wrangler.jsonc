@@ -9,24 +9,15 @@
   "vars": {
     "ENVIRONMENT": "production",
     "pan123_client_id":"",
-    "pan123_client_secret":""
+    "pan123_client_secret":"",
+    "admin_password":""
   },
-  //  "env": {
-  //    "dev": {
-  //      "vars": {
-  //        "ENVIRONMENT": "development"
-  //      }
-  //    }
-  //  },
   "dev": {
     "port": 8787
   },
   "assets": {
     "directory": "../client/dist"
   },
-  // "compatibility_flags": [
-  //   "nodejs_compat"
-  // ],
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
@@ -41,7 +32,7 @@
   // ],
   "d1_databases": [
     {
-      "binding": "",
+      "binding": "database",
       "database_name": "",
       "database_id": "",
       "migrations_dir": "drizzle/migrations"
