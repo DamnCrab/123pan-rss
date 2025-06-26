@@ -1,5 +1,5 @@
-import {resolver} from "hono-openapi/zod";
 import {z} from "zod";
+import {resolver} from "hono-openapi/zod";
 
 export const errorResponseSchema = z.object({
     success: z.boolean().describe('success'),

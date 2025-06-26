@@ -73,7 +73,10 @@ app.post('/login',
 
             const user = users[0];
             if (!user || !(await verifyPassword(password, user.password))) {
-                return c.json({error: '用户名或密码错误'}, 401)
+                return c.json({
+                    success: false,
+                    message: '用户名或密码错误'
+                }, 401)
             }
 
             const token = await signUserJwt(user);
@@ -87,30 +90,46 @@ app.post('/login',
             });
 
             return c.json({
+                success: true,
                 message: '登录成功',
-                token,
-                user: {
-                    id: user.id,
-                    username: user.username
+                data: {
+                    token,
+                    user: {
+                        id: user.id,
+                        username: user.username
+                    }
                 }
             })
         } catch (error) {
             console.error('登录错误:', error);
-            return c.json({error: '服务器内部错误'}, 500)
+            return c.json({
+                success: false,
+                message: '服务器内部错误',
+                error: error instanceof Error ? error.message : '未知错误'
+            }, 500)
         }
     })
 
 // 登出接口
-app.post('/logout', async (c) => {
-    // 清除cookie中的JWT token
-    setCookie(c, 'auth_token', '', {
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-        maxAge: 0 // 立即过期
-    });
+app.post('/logout',
+    describeRoute({
+        tags: ['User'],
+        summary: '用户登出',
+        description: '清除用户的认证token，退出登录状态',
+        responses: responseSchema()
+    }), async (c) => {
+        // 清除cookie中的JWT token
+        setCookie(c, 'auth_token', '', {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'Lax',
+            maxAge: 0 // 立即过期
+        });
 
-    return c.json({message: '登出成功'})
-})
+        return c.json({
+            success: true,
+            message: '登出成功'
+        })
+    })
 
 export default app

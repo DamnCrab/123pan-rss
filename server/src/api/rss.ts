@@ -46,9 +46,9 @@ const rssSubscriptionSchema = z.object({
     refreshInterval: z.number().describe('刷新间隔，单位：分钟'),
     refreshUnit: z.enum(['minutes', 'hours']).describe('刷新单位，minutes或hours'),
     isActive: z.number().describe('订阅状态，1: 激活, 0: 停用'),
-    lastRefresh: z.string().nullable().describe('最后刷新时间，ISO格式字符串'),
-    createdAt: z.string().describe('创建时间，ISO格式字符串'),
-    updatedAt: z.string().describe('更新时间，ISO格式字符串')
+    lastRefresh: z.number().nullable().describe('最后刷新时间 (时间戳)'),
+    createdAt: z.number().describe('创建时间 (时间戳)'),
+    updatedAt: z.number().describe('更新时间 (时间戳)')
 }).openapi({
     ref: 'RssSubscription',
     example: {
@@ -61,8 +61,27 @@ const rssSubscriptionSchema = z.object({
         refreshUnit: 'minutes',
         isActive: 1,
         lastRefresh: null,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z'
+        createdAt: 1704067200000,
+        updatedAt: 1704067200000
+    }
+})
+
+// 查询参数验证schema
+const searchQuerySchema = z.object({
+    search: z.string().optional().describe('按文件夹名称搜索')
+}).openapi({
+    ref: 'SearchQuery',
+    example: {
+        search: '动漫'
+    }
+})
+
+const idQuerySchema = z.object({
+    id: z.string().regex(/^\d+$/, 'ID必须是有效的数字').describe('RSS订阅ID')
+}).openapi({
+    ref: 'IdQuery',
+    example: {
+        id: '1'
     }
 })
 
@@ -81,7 +100,7 @@ app.post('/',
             const user = c.get('jwtPayload')
             const database = db(c.env)
 
-            const now = new Date().toISOString()
+            const now = Date.now()
 
             const [newSubscription] = await database.insert(rssSubscriptionsTable).values({
                 userId: user.id,
@@ -117,24 +136,13 @@ app.get('/',
         summary: '获取RSS订阅列表',
         description: '获取当前用户的所有RSS订阅列表，支持按名称搜索',
         security: [{bearerAuth: []}],
-        parameters: [
-            {
-                name: 'search',
-                in: 'query',
-                required: false,
-                description: '按文件夹名称搜索',
-                schema: {
-                    type: 'string',
-                    example: '动漫'
-                }
-            }
-        ],
-        responses: responseSchema()
-    }), async (c) => {
+        responses: responseSchema(z.array(rssSubscriptionSchema))
+    }),
+    zValidator('query', searchQuerySchema), async (c) => {
         try {
             const user = c.get('jwtPayload')
             const database = db(c.env)
-            const search = c.req.query('search')
+            const { search } = c.req.valid('query')
 
             // 构建查询条件
             let whereCondition: SQL | undefined = eq(rssSubscriptionsTable.userId, user.id)
@@ -172,31 +180,14 @@ app.get('/detail',
         tags: ['RSS订阅'],
         summary: '获取单个RSS订阅',
         description: '根据ID获取指定的RSS订阅详情',
-        parameters: [
-            {
-                name: 'id',
-                in: 'query',
-                required: true,
-                description: 'RSS订阅ID',
-                schema: {
-                    type: 'integer',
-                    example: 1
-                }
-            }
-        ],
         responses: responseSchema(rssSubscriptionSchema)
-    }), async (c) => {
+    }),
+    zValidator('query', idQuerySchema), async (c) => {
         try {
-            const id = parseInt(c.req.query('id') || '')
+            const { id: idStr } = c.req.valid('query')
+            const id = parseInt(idStr)
             const user = c.get('jwtPayload')
             const database = db(c.env)
-
-            if (isNaN(id)) {
-                return c.json({
-                    success: false,
-                    message: '无效的订阅ID'
-                }, 400)
-            }
 
             const [subscription] = await database
                 .select()
@@ -236,33 +227,16 @@ app.put('/update',
         summary: '更新RSS订阅',
         description: '根据ID更新指定的RSS订阅信息',
         security: [{bearerAuth: []}],
-        parameters: [
-            {
-                name: 'id',
-                in: 'query',
-                required: true,
-                description: 'RSS订阅ID',
-                schema: {
-                    type: 'integer',
-                    example: 1
-                }
-            }
-        ],
-        responses: responseSchema()
+        responses: responseSchema(rssSubscriptionSchema)
     }),
+    zValidator('query', idQuerySchema),
     zValidator('json', rssSchema.partial()), async (c) => {
         try {
-            const id = parseInt(c.req.query('id') || '')
+            const { id: idStr } = c.req.valid('query')
+            const id = parseInt(idStr)
             const data = c.req.valid('json')
             const user = c.get('jwtPayload')
             const database = db(c.env)
-
-            if (isNaN(id)) {
-                return c.json({
-                    success: false,
-                    message: '无效的订阅ID'
-                }, 400)
-            }
 
             // 检查订阅是否存在且属于当前用户
             const [existingSubscription] = await database
@@ -284,7 +258,7 @@ app.put('/update',
 
             const updateData: any = {
                 ...data,
-                updatedAt: new Date().toISOString()
+                updatedAt: Date.now()
             }
 
             if (data.isActive !== undefined) {
@@ -323,31 +297,14 @@ app.delete('/remove',
         summary: '删除RSS订阅',
         description: '根据ID删除指定的RSS订阅',
         security: [{bearerAuth: []}],
-        parameters: [
-            {
-                name: 'id',
-                in: 'query',
-                required: true,
-                description: 'RSS订阅ID',
-                schema: {
-                    type: 'integer',
-                    example: 1
-                }
-            }
-        ],
         responses: responseSchema()
-    }), async (c) => {
+    }),
+    zValidator('query', idQuerySchema), async (c) => {
         try {
-            const id = parseInt(c.req.query('id') || '')
+            const { id: idStr } = c.req.valid('query')
+            const id = parseInt(idStr)
             const user = c.get('jwtPayload')
             const database = db(c.env)
-
-            if (isNaN(id)) {
-                return c.json({
-                    success: false,
-                    message: '无效的订阅ID'
-                }, 400)
-            }
 
             // 检查订阅是否存在且属于当前用户
             const [existingSubscription] = await database
@@ -396,31 +353,14 @@ app.patch('/toggle',
         summary: '切换RSS订阅激活状态',
         description: '切换指定RSS订阅的激活/停用状态',
         security: [{bearerAuth: []}],
-        parameters: [
-            {
-                name: 'id',
-                in: 'query',
-                required: true,
-                description: 'RSS订阅ID',
-                schema: {
-                    type: 'integer',
-                    example: 1
-                }
-            }
-        ],
-        responses: responseSchema()
-    }), async (c) => {
+        responses: responseSchema(rssSubscriptionSchema)
+    }),
+    zValidator('query', idQuerySchema), async (c) => {
         try {
-            const id = parseInt(c.req.query('id') || '')
+            const { id: idStr } = c.req.valid('query')
+            const id = parseInt(idStr)
             const user = c.get('jwtPayload')
             const database = db(c.env)
-
-            if (isNaN(id)) {
-                return c.json({
-                    success: false,
-                    message: '无效的订阅ID'
-                }, 400)
-            }
 
             // 获取当前状态
             const [currentSubscription] = await database
@@ -447,7 +387,7 @@ app.patch('/toggle',
                 .update(rssSubscriptionsTable)
                 .set({
                     isActive: newStatus,
-                    updatedAt: new Date().toISOString()
+                    updatedAt: Date.now()
                 })
                 .where(
                     and(

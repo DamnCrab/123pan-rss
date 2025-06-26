@@ -4,7 +4,9 @@ import { logger } from 'hono/logger'
 import user from "./api/user";
 import rss from "./api/rss";
 import magnet from "./api/magnet";
+import cloud123 from "./api/cloud123";
 import { processRSSFeeds } from "./api/magnet";
+import { refreshTokenIfNeeded } from "./api/cloud123";
 import openapi from "./middleware/openapi";
 import { cors } from 'hono/cors'
 
@@ -17,6 +19,7 @@ app.use('*', cors({
 app.route('/api/user', user)
 app.route('/api/rss', rss)
 app.route('/api/magnet', magnet)
+app.route('/api/cloud123', cloud123)
 
 app.notFound((c) => {
     return c.json(
@@ -41,7 +44,12 @@ export default {
     async scheduled(controller: any, env: any, ctx: any) {
         console.log('定时任务开始执行:', new Date().toISOString())
         try {
+            // 刷新123云盘token（如果需要）
+            await refreshTokenIfNeeded(env)
+            
+            // 处理RSS订阅
             await processRSSFeeds(env)
+            
             console.log('定时任务执行成功')
         } catch (error) {
             console.error('定时任务执行失败:', error)
