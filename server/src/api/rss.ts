@@ -7,8 +7,10 @@ import {jwtMiddleware} from '../middleware/jwt'
 import {db} from "../db";
 import {eq, and, like, SQL} from 'drizzle-orm';
 import {rssSubscriptionsTable} from "../db/schema";
-import {createFolder} from "./cloud123";
+
 import {responseSchema} from "../utils/responseSchema";
+import {createFolder} from "../utils/cloud123";
+import {updateSingleRSS} from "../utils/rss";
 
 const app = new Hono()
 
@@ -426,6 +428,82 @@ app.patch('/toggle',
             return c.json({
                 success: false,
                 message: '切换RSS订阅状态失败',
+                error: error instanceof Error ? error.message : '未知错误'
+            }, 500)
+        }
+    })
+
+// 手动更新单个RSS订阅
+app.post('/update-feed',
+    describeRoute({
+        tags: ['RSS订阅'],
+        summary: '手动更新单个RSS订阅',
+        description: '手动触发指定RSS订阅的更新，获取最新的磁力链接',
+        security: [{bearerAuth: []}],
+        responses: responseSchema(z.object({
+            success: z.boolean(),
+            message: z.string(),
+            newItems: z.number().describe('新增的磁力链接数量'),
+            skipped: z.boolean().describe('是否因为时间间隔跳过更新')
+        }).openapi({
+            ref: 'UpdateFeedResponse',
+            example: {
+                success: true,
+                message: '更新成功，新增3个磁力链接',
+                newItems: 3,
+                skipped: false
+            }
+        }))
+    }),
+    zValidator('query', idQuerySchema), async (c) => {
+        try {
+            const { id: idStr } = c.req.valid('query')
+            const id = parseInt(idStr)
+            const user = c.get('jwtPayload')
+            const database = db(c.env)
+
+            // 检查订阅是否存在且属于当前用户
+            const [existingSubscription] = await database
+                .select()
+                .from(rssSubscriptionsTable)
+                .where(
+                    and(
+                        eq(rssSubscriptionsTable.id, id),
+                        eq(rssSubscriptionsTable.userId, user.id)
+                    )
+                )
+
+            if (!existingSubscription) {
+                return c.json({
+                    success: false,
+                    message: 'RSS订阅不存在'
+                }, 404)
+            }
+
+            // 调用更新单个RSS的方法
+            const result = await updateSingleRSS(c.env, id)
+
+            if (result.success) {
+                return c.json({
+                    success: true,
+                    message: result.skipped 
+                        ? '订阅更新被跳过（未到刷新时间）' 
+                        : `更新成功，新增${result.newItems}个磁力链接`,
+                    data: {
+                        newItems: result.newItems,
+                        skipped: result.skipped
+                    }
+                })
+            } else {
+                return c.json({
+                    success: false,
+                    message: result.error || '更新RSS订阅失败'
+                }, 500)
+            }
+        } catch (error) {
+            return c.json({
+                success: false,
+                message: '更新RSS订阅失败',
                 error: error instanceof Error ? error.message : '未知错误'
             }, 500)
         }

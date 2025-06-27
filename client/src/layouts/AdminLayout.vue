@@ -2,7 +2,7 @@
   <n-layout class="min-h-screen">
     <!-- 顶部导航栏 -->
     <n-layout-header class="h-16 flex items-center justify-between px-6 border-b">
-      <n-h2 class="!mb-0">123-DMHY-RSS 管理后台</n-h2>
+      <n-h2 class="!mb-0">管理后台</n-h2>
       <n-dropdown trigger="hover" :options="userMenuOptions" @select="handleUserMenuSelect">
         <n-button text>
           <template #icon>

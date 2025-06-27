@@ -10,8 +10,7 @@
 - [x] 123云盘离线下载
 - [ ] 123云盘离线下载状态查询
 - [ ] 前端页面
-
-vibe coding一时爽 一直vibe coding一直爽
+- [ ] 针对workers进行优化 防止30s超时
 
 ## 部署
 
@@ -19,12 +18,12 @@ vibe coding一时爽 一直vibe coding一直爽
 
 #### 在cloudflare workers中需要创建的环境变量
 
-| 环境变量                   | 描述        | 示例         |
-|------------------------|-----------|------------|
-| `ENVIRONMENT`          | 开发环境/本地环境 | production |
-| `pan123_client_id`     | 123云盘申请   |            |
-| `pan123_client_secret` | 123云盘申请   |            |
-|                        |           |            |
+| 环境变量                   | 描述             | 示例         |
+|------------------------|----------------|------------|
+| `ENVIRONMENT`          | 开发环境/本地环境      | production |
+| `pan123_client_id`     | 123云盘申请        |            |
+| `pan123_client_secret` | 123云盘申请        |            |
+| `admin_password`       | 初始admin用户密码 不填则为admin123 |            |
 
 #### 在本地wrangler.jsonc中需要配置的环境变量
 

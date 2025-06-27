@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
-import { NConfigProvider, NMessageProvider, darkTheme, zhCN, dateZhCN } from 'naive-ui'
-import { ref } from 'vue'
+import {zhCN, dateZhCN} from 'naive-ui'
 
 const theme = ref(null) // 可以设置为 darkTheme 来启用暗色主题
 </script>
 
 <template>
   <NConfigProvider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
-    <NMessageProvider>
-      <RouterView />
-    </NMessageProvider>
+    <n-dialog-provider>
+      <NMessageProvider>
+        <RouterView/>
+      </NMessageProvider>
+    </n-dialog-provider>
   </NConfigProvider>
 </template>
 

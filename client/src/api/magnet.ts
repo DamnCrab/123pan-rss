@@ -31,22 +31,23 @@ export interface MagnetListQuery {
 
 // 批量重试参数
 export interface BatchRetryParams {
-  magnetIds: number[]
+  magnetIds?: number[]
+  rssSubscriptionIds?: number[]
 }
 
 // 获取磁力链接列表
 export const getMagnetLinks = (params?: MagnetListQuery) => {
-  return request.get('/api/magnet', { params })
+  return request.get('/api/magnet/list', { params })
 }
 
-// 手动刷新RSS订阅
-export const refreshRSSSubscription = (rssId: number) => {
-  return request.post(`/api/magnet/refresh/${rssId}`)
+// 手动触发RSS更新
+export const refreshRSSSubscription = () => {
+  return request.post('/api/magnet/trigger')
 }
 
 // 批量重试下载任务
 export const batchRetryDownload = (data: BatchRetryParams) => {
-  return request.post('/api/cloud123/batch-retry', data)
+  return request.post('/api/cloud123/offline/retry', data)
 }
 
 // 删除磁力链接

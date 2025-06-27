@@ -180,6 +180,16 @@
 
                 <n-button
                   size="small"
+                  @click="openMagnetModal(rss)"
+                >
+                  <template #icon>
+                    <n-icon><LinkOutline /></n-icon>
+                  </template>
+                  磁力链接
+                </n-button>
+
+                <n-button
+                  size="small"
                   @click="editRss(rss)"
                 >
                   <template #icon>
@@ -212,12 +222,19 @@
         </n-grid-item>
       </n-grid>
     </n-spin>
+
+    <!-- 磁力链接管理弹窗 -->
+    <MagnetLinksModal
+      v-model:show="magnetModalVisible"
+      :rss-id="selectedRssId"
+      :rss-title="selectedRssTitle"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import type {CascaderOption, FormInst, FormRules} from 'naive-ui'
-import {AddOutline, CreateOutline, TrashOutline} from '@vicons/ionicons5'
+import {AddOutline, CreateOutline, TrashOutline, LinkOutline} from '@vicons/ionicons5'
 import {type FileInfo, type FileListQuery, getFileList} from '@/api/cloud'
 import {
   createRSSSubscription,
@@ -228,6 +245,7 @@ import {
   updateRSSSubscription,
   type UpdateRSSSubscriptionParams
 } from '@/api/rss'
+import MagnetLinksModal from '@/components/MagnetLinksModal.vue'
 
 interface RssSubscription {
   id: number
@@ -268,6 +286,11 @@ const rssList = ref<RssSubscription[]>([])
 const showAddForm = ref(false)
 const editingRss = ref<RssSubscription | null>(null)
 const loading = ref(false)
+
+// 磁力链接弹窗相关状态
+const magnetModalVisible = ref(false)
+const selectedRssId = ref<number | null>(null)
+const selectedRssTitle = ref('')
 
 const formData = ref<FormData>({
   rssUrl: '',
@@ -543,6 +566,13 @@ const handleFolderPathChange = (value: number | number[] | null, option: Cascade
 // 格式化日期
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('zh-CN')
+}
+
+// 打开磁力链接管理弹窗
+const openMagnetModal = (rss: RssSubscription) => {
+  selectedRssId.value = rss.id
+  selectedRssTitle.value = rss.folderName
+  magnetModalVisible.value = true
 }
 
 // 组件挂载时获取数据
