@@ -3,7 +3,7 @@ import {sign} from 'hono/jwt'
 import {z} from 'zod'
 import "zod-openapi/extend";
 import {describeRoute} from "hono-openapi";
-import { validator as zValidator} from "hono-openapi/zod";
+import {validator as zValidator} from "hono-openapi/zod";
 import {db} from "../db";
 import {eq} from 'drizzle-orm';
 import {setCookie} from 'hono/cookie';
@@ -85,12 +85,13 @@ app.post('/login',
     }),
     zValidator('json', loginSchema), async (c) => {
         const {username, password} = c.req.valid('json')
+        const env = c.env as Cloudflare.Env
 
         // 初始化默认用户
-        await initDefaultUser(c.env);
+        await initDefaultUser(env);
 
         try {
-            const database = db(c.env);
+            const database = db(env);
             // 从数据库验证用户凭据
             const users = await database.select().from(usersTable)
                 .where(eq(usersTable.username, username)).limit(1);
@@ -108,9 +109,9 @@ app.post('/login',
             // 将JWT存储到cookie中
             setCookie(c, 'auth_token', token, {
                 httpOnly: true,
-                secure: false, // 在生产环境中应设为true
+                secure: true,
                 sameSite: 'Lax',
-                maxAge: 60 * 60 * 24 // 24小时
+                maxAge: 60 * 60 * 24 * 30 // 30天有效期
             });
 
             return c.json({
@@ -222,7 +223,7 @@ app.put('/admin/profile',
     jwtMiddleware,
     zValidator('json', updateAdminSchema),
     async (c) => {
-        const { newUsername, newPassword, currentPassword } = c.req.valid('json');
+        const {newUsername, newPassword, currentPassword} = c.req.valid('json');
         const user = c.get('jwtPayload')
 
         try {
@@ -301,7 +302,7 @@ app.put('/password',
     jwtMiddleware,
     zValidator('json', changePasswordSchema),
     async (c) => {
-        const { currentPassword, newPassword } = c.req.valid('json');
+        const {currentPassword, newPassword} = c.req.valid('json');
         const user = c.get('jwtPayload')
 
         try {

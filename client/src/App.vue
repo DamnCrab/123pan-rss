@@ -1,27 +1,17 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-fetch('/api/rss/hello')
-  .then(response => response.json())
-  .then(data => console.log(data))
-  .catch(error => console.error('Error fetching data:', error));
+import { RouterView } from 'vue-router'
+import { NConfigProvider, NMessageProvider, darkTheme, zhCN, dateZhCN } from 'naive-ui'
+import { ref } from 'vue'
+
+const theme = ref(null) // 可以设置为 darkTheme 来启用暗色主题
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+  <NConfigProvider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
+    <NMessageProvider>
+      <RouterView />
+    </NMessageProvider>
+  </NConfigProvider>
 </template>
 
 <style scoped>

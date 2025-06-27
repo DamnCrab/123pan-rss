@@ -9,13 +9,18 @@ import { processRSSFeeds } from "./api/magnet";
 import { refreshTokenIfNeeded } from "./api/cloud123";
 import openapi from "./middleware/openapi";
 import { cors } from 'hono/cors'
+import { csrf } from 'hono/csrf'
 
 const app = new Hono()
 
 app.use(logger())
 app.use('*', cors({
-    origin: ['http://localhost:8787'], // 允许所有来源
+    origin: ['http://localhost:8787','http://localhost:5173'],
+    // allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
 }));
+// app.use(csrf())
+
 app.route('/api/user', user)
 app.route('/api/rss', rss)
 app.route('/api/magnet', magnet)
@@ -38,7 +43,7 @@ app.onError((err, c) => {
 });
 openapi(app)
 
-// 定时任务处理器 - 每5分钟执行一次
+// 定时任务处理器
 export default {
     fetch: app.fetch,
     async scheduled(controller: any, env: any, ctx: any) {
@@ -46,10 +51,10 @@ export default {
         try {
             // 刷新123云盘token（如果需要）
             await refreshTokenIfNeeded(env)
-            
+
             // 处理RSS订阅
             await processRSSFeeds(env)
-            
+
             console.log('定时任务执行成功')
         } catch (error) {
             console.error('定时任务执行失败:', error)
