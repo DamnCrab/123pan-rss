@@ -20,6 +20,7 @@ const rssSchema = z.object({
     rssUrl: z.string().url('请输入有效的RSS链接'),
     folderPath: z.string().min(1, '文件夹路径不能为空'),
     folderName: z.string().min(1, '文件夹名称不能为空'),
+    cloudFolderName: z.string().min(1, '云盘文件夹名称不能为空'),
     refreshInterval: z.number().min(1, '刷新间隔必须大于0'),
     refreshUnit: z.enum(['minutes', 'hours'], {
         errorMap: () => ({message: '刷新单位只能是minutes或hours'})
@@ -31,6 +32,7 @@ const rssSchema = z.object({
         rssUrl: 'https://example.com/rss.xml',
         folderPath: '/downloads/anime',
         folderName: '动漫下载',
+        cloudFolderName: '动漫RSS订阅',
         refreshInterval: 30,
         refreshUnit: 'minutes',
         isActive: true
@@ -44,6 +46,7 @@ const rssSubscriptionSchema = z.object({
     rssUrl: z.string().describe('RSS链接'),
     folderPath: z.string().describe('文件夹路径'),
     folderName: z.string().describe('文件夹名称'),
+    cloudFolderName: z.string().describe('云盘文件夹名称'),
     refreshInterval: z.number().describe('刷新间隔，单位：分钟'),
     refreshUnit: z.enum(['minutes', 'hours']).describe('刷新单位，minutes或hours'),
     isActive: z.number().describe('订阅状态，1: 激活, 0: 停用'),
@@ -58,6 +61,7 @@ const rssSubscriptionSchema = z.object({
         rssUrl: 'https://example.com/rss.xml',
         folderPath: '/downloads/anime',
         folderName: '动漫下载',
+        cloudFolderName: '动漫RSS订阅',
         refreshInterval: 30,
         refreshUnit: 'minutes',
         isActive: 1,
@@ -105,7 +109,7 @@ app.post('/',
 
             // 在123云盘中创建文件夹
             const folderResult = await createFolder(c.env, {
-                name: data.folderName!,
+                name: data.cloudFolderName!,
                 parentID: parseInt(data.folderPath!)
             });
 
@@ -122,6 +126,7 @@ app.post('/',
                 folderPath: data.folderPath!,
                 folderName: data.folderName!,
                 cloudFolderId: folderResult.dirID.toString(),
+                cloudFolderName: data.cloudFolderName!,
                 refreshInterval: data.refreshInterval!,
                 refreshUnit: data.refreshUnit || 'minutes',
                 isActive: data.isActive !== undefined ? (data.isActive ? 1 : 0) : 1,
@@ -134,7 +139,7 @@ app.post('/',
                 success: true,
                 message: 'RSS订阅添加成功',
                 data: newSubscription
-            }, 201)
+            }, 200)
         } catch (error) {
             return c.json({
                 success: false,

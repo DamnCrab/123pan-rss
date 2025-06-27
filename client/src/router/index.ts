@@ -7,7 +7,7 @@ const checkAuth = async (): Promise<boolean> => {
   if (!token) {
     return false
   }
-  
+
   try {
     const result = await getUserProfile()
     return result.success
@@ -24,11 +24,6 @@ const router = createRouter({
     {
       path: '/',
       redirect: '/login'
-    },
-    {
-      path: '/rss',
-      name: 'rss',
-      component: () => import('../views/RssView.vue'),
     },
     {
       path: '/login',
@@ -72,7 +67,7 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-  
+
   if (requiresAuth) {
     const isAuthenticated = await checkAuth()
     if (!isAuthenticated) {
@@ -80,7 +75,7 @@ router.beforeEach(async (to, from, next) => {
       return
     }
   }
-  
+
   // 如果已登录用户访问登录页，重定向到管理页面
   if (to.name === 'login') {
     const isAuthenticated = await checkAuth()
@@ -89,7 +84,7 @@ router.beforeEach(async (to, from, next) => {
       return
     }
   }
-  
+
   next()
 })
 

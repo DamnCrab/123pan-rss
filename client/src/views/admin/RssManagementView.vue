@@ -33,31 +33,35 @@
             clearable
           />
         </n-form-item>
-
-        <n-form-item path="folderPath" label="文件夹路径">
+        <n-form-item path="folderName" label="选择文件夹">
           <n-cascader
-            v-model:value="formData.folderPath"
+            v-model:value="formData.folderName"
+            :disabled="!!editingRss"
             :options="folderOptions"
             :loading="loadingFolders"
             :on-load="handleLoadFolders"
+            allow-checking-not-loaded
             @update:value="handleFolderPathChange"
             @focus="initializeFolderOptions"
-            placeholder="请选择文件夹路径"
-            check-strategy="child"
+            placeholder="请选择文件夹"
+            check-strategy="all"
             remote
             clearable
-            filterable
             show-path
             separator=" / "
           />
         </n-form-item>
 
-        <n-form-item path="folderName" label="文件夹名称">
+        <n-form-item path="cloudFolderName" label="文件夹名称">
           <n-input
-            v-model:value="formData.folderName"
-            placeholder="动漫下载"
+            v-model:value="formData.cloudFolderName"
+            placeholder="请输入要创建的文件夹名称"
             clearable
+            :disabled="!!editingRss"
           />
+          <template #feedback>
+            <span class="text-gray-500 text-sm">此名称将用于在123云盘中创建文件夹，创建后不可修改</span>
+          </template>
         </n-form-item>
 
         <n-grid :cols="2" :x-gap="12">
@@ -212,37 +216,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import type {CascaderOption, FormInst, FormRules} from 'naive-ui'
+import {AddOutline, CreateOutline, TrashOutline} from '@vicons/ionicons5'
+import {type FileInfo, type FileListQuery, getFileList} from '@/api/cloud'
 import {
-  NCascader,
-  NButton,
-  NModal,
-  NCard,
-  NForm,
-  NFormItem,
-  NInput,
-  NInputNumber,
-  NSelect,
-  NSwitch,
-  NSpace,
-  NGrid,
-  NGridItem,
-  NTag,
-  NIcon,
-  NEmpty,
-  NSpin,
-  useMessage,
-  NPopconfirm,
-  NH1
-} from 'naive-ui'
-import type { CascaderOption, FormInst, FormRules } from 'naive-ui'
-import { AddOutline, CreateOutline, TrashOutline, RefreshOutline } from '@vicons/ionicons5'
+  createRSSSubscription,
+  type CreateRSSSubscriptionParams,
+  deleteRSSSubscription,
+  getRSSSubscriptions,
+  toggleRSSSubscription,
+  updateRSSSubscription,
+  type UpdateRSSSubscriptionParams
+} from '@/api/rss'
 
 interface RssSubscription {
   id: number
   rssUrl: string
   folderPath: string
   folderName: string
+  cloudFolderName: string
   refreshInterval: number
   refreshUnit: 'minutes' | 'hours'
   isActive: number
@@ -253,22 +245,15 @@ interface RssSubscription {
 
 interface FormData {
   rssUrl: string
-  folderPath: number | string  // 支持文件夹ID或路径字符串
-  folderName: string
+  folderPath: number  // 级联选择器的值，数组形式
+  folderName: string  // 存储文件夹名称用于回显
+  cloudFolderName: string  // 在123云盘中创建的文件夹名称
   refreshInterval: number
   refreshUnit: 'minutes' | 'hours'
   isActive: boolean
 }
 
-interface FileItem {
-  fileId: number
-  filename: string
-  type: number  // 1: 文件夹, 0: 文件
-  parentFileId: number
-  size: number
-  createAt: string
-  updateAt: string
-}
+// 使用从 cloud.ts 导入的 FileInfo 接口
 
 interface FolderCascaderOption extends CascaderOption {
   value: number  // 使用 fileId 作为 value
@@ -286,8 +271,9 @@ const loading = ref(false)
 
 const formData = ref<FormData>({
   rssUrl: '',
-  folderPath: '',  // 初始为空字符串，选择后会变为文件夹ID
-  folderName: '',
+  folderPath: 0,  // 级联选择器的值
+  folderName: '',  // 存储文件夹名称
+  cloudFolderName: '',  // 在123云盘中创建的文件夹名称
   refreshInterval: 30,
   refreshUnit: 'minutes',
   isActive: true
@@ -311,17 +297,23 @@ const formRules: FormRules = {
       trigger: ['input', 'blur']
     }
   ],
-  folderPath: [
-    {
-      required: true,
-      message: '请选择文件夹路径',
-      trigger: ['change', 'blur']
-    }
-  ],
   folderName: [
     {
       required: true,
       message: '请输入文件夹名称',
+      trigger: ['input', 'blur']
+    }
+  ],
+  cloudFolderName: [
+    {
+      required: true,
+      message: '请输入文件夹名称',
+      trigger: ['input', 'blur']
+    },
+    {
+      min: 1,
+      max: 50,
+      message: '文件夹名称长度应在1-50个字符之间',
       trigger: ['input', 'blur']
     }
   ],
@@ -345,15 +337,7 @@ const formRules: FormRules = {
 const fetchRssList = async () => {
   try {
     loading.value = true
-    const response = await fetch('/api/rss', {
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      throw new Error('获取RSS列表失败')
-    }
-
-    const result = await response.json()
+    const result = await getRSSSubscriptions()
     if (result.success) {
       rssList.value = result.data
     } else {
@@ -374,24 +358,29 @@ const submitForm = async () => {
     await formRef.value.validate()
     loading.value = true
 
-    const url = editingRss.value ? `/api/rss/${editingRss.value.id}` : '/api/rss'
-    const method = editingRss.value ? 'PUT' : 'POST'
-
     // 准备提交数据
-    const submitData = {
-      ...formData.value
+    const submitData: CreateRSSSubscriptionParams | UpdateRSSSubscriptionParams = {
+      rssUrl: formData.value.rssUrl,
+      folderPath: formData.value.folderPath.toString(),
+      folderName: formData.value.folderName,
+      cloudFolderName: formData.value.cloudFolderName,
+      refreshInterval: formData.value.refreshInterval,
+      refreshUnit: formData.value.refreshUnit,
+      isActive: formData.value.isActive
     }
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(submitData)
-    })
-
-    const result = await response.json()
+    let result
+    if (editingRss.value) {
+      // 更新RSS订阅
+      result = await updateRSSSubscription({
+        ...submitData,
+        id: editingRss.value.id
+      } as UpdateRSSSubscriptionParams)
+    } else {
+      // 创建RSS订阅
+      result = await createRSSSubscription(submitData as CreateRSSSubscriptionParams)
+    }
+    console.log(result)
 
     if (result.success) {
       message.success(result.message || '操作成功')
@@ -401,21 +390,28 @@ const submitForm = async () => {
       message.error(result.message || '操作失败')
     }
   } catch (error) {
+    console.log(error)
     message.error('网络错误，请稍后重试')
   } finally {
     loading.value = false
   }
 }
 
+// 根据文件夹ID构建路径数组（简化版本，实际应用中可能需要从API获取完整路径）
+const buildFolderPath = (folderId: string): number[] => {
+  // 这里简化处理，实际应用中可能需要递归查找父文件夹
+  // 目前只返回当前文件夹ID
+  return folderId ? [parseInt(folderId)] : []
+}
+
 // 编辑RSS
 const editRss = (rss: RssSubscription) => {
   editingRss.value = rss
-  // 对于编辑模式，我们直接使用原始路径字符串
-  // 级联选择器会根据这个值来显示选中状态
   formData.value = {
     rssUrl: rss.rssUrl,
-    folderPath: rss.folderPath || '',
-    folderName: rss.folderName,
+    folderPath: Number(rss.folderPath),  // 构建路径数组
+    folderName: rss.folderName,        // 文件夹名称用于回显
+    cloudFolderName: rss.cloudFolderName || '',  // 云盘文件夹名称（编辑时不可修改）
     refreshInterval: rss.refreshInterval,
     refreshUnit: rss.refreshUnit,
     isActive: Boolean(rss.isActive)
@@ -427,12 +423,7 @@ const editRss = (rss: RssSubscription) => {
 const deleteRss = async (id: number) => {
   try {
     loading.value = true
-    const response = await fetch(`/api/rss/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
-
-    const result = await response.json()
+    const result = await deleteRSSSubscription(id)
 
     if (result.success) {
       message.success(result.message || '删除成功')
@@ -451,12 +442,7 @@ const deleteRss = async (id: number) => {
 const toggleRssStatus = async (rss: RssSubscription) => {
   try {
     loading.value = true
-    const response = await fetch(`/api/rss/${rss.id}/toggle`, {
-      method: 'PATCH',
-      credentials: 'include'
-    })
-
-    const result = await response.json()
+    const result = await toggleRSSSubscription(rss.id)
 
     if (result.success) {
       message.success(result.message || '操作成功')
@@ -477,8 +463,9 @@ const cancelForm = () => {
   editingRss.value = null
   formData.value = {
     rssUrl: '',
-    folderPath: '',
+    folderPath: 0,
     folderName: '',
+    cloudFolderName: '',
     refreshInterval: 30,
     refreshUnit: 'minutes',
     isActive: true
@@ -488,29 +475,23 @@ const cancelForm = () => {
 // 获取文件夹数据
 const fetchFolders = async (parentFileId: number = 0): Promise<FolderCascaderOption[]> => {
   try {
-    const response = await fetch(`/api/files?parentFileId=${parentFileId}`, {
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      throw new Error('获取文件夹列表失败')
+    const query: FileListQuery = {
+      parentFileId,
+      trashed: false
     }
 
-    const result = await response.json()
-    if (result.success) {
-      // 只返回文件夹类型的数据 (type === 1)
-      const folders = result.data.fileList.filter((item: FileItem) => item.type === 1)
-      return folders.map((folder: FileItem) => ({
-        value: folder.fileId,
-        label: folder.filename,
-        isLeaf: false // 假设所有文件夹都可能有子文件夹
-      }))
-    } else {
-      message.error(result.message || '获取文件夹列表失败')
-      return []
-    }
+    const result = await getFileList(query)
+    console.log(result)
+
+    // 只返回文件夹类型的数据 (type === 1)
+    return result.data.fileList.filter((item: FileInfo) => item.type === 1).map((folder: FileInfo) => ({
+      value: folder.fileId,
+      label: folder.filename,
+      isLeaf: false
+    }))
   } catch (error) {
-    message.error('网络错误，请稍后重试')
+    console.log(error)
+    message.error('获取文件夹列表失败，请稍后重试')
     return []
   }
 }
@@ -524,7 +505,11 @@ const handleLoadFolders = async (option: CascaderOption) => {
     // 根据选中的文件夹ID获取子文件夹
     const parentFileId = Number(option.value)
     const subFolders = await fetchFolders(parentFileId)
-    option.children = subFolders
+    if (subFolders.length){
+      option.children = subFolders
+    } else{
+      option.isLeaf = true
+    }
   } catch (error) {
     console.error('加载子文件夹失败:', error)
   } finally {
@@ -539,22 +524,19 @@ const initializeFolderOptions = async () => {
 
   loadingFolders.value = true
   try {
-    const rootFolders = await fetchFolders(0)
-    folderOptions.value = rootFolders
+    folderOptions.value = await fetchFolders(0)
   } finally {
     loadingFolders.value = false
   }
 }
 
 // 处理文件夹路径变化
-const handleFolderPathChange = (value: number | number[] | null) => {
-  if (Array.isArray(value) && value.length > 0) {
-    // 取最后一个选中的文件夹ID作为文件夹路径
-    formData.value.folderPath = value[value.length - 1]
-  } else if (typeof value === 'number') {
-    formData.value.folderPath = value
-  } else {
-    formData.value.folderPath = ''
+const handleFolderPathChange = (value: number | number[] | null, option: CascaderOption | CascaderOption[] | null,pathValues) => {
+  console.log(value,option,pathValues)
+
+  if (option && !Array.isArray(option)) {
+    formData.value.folderPath = Number(option.value)
+    formData.value.folderName = option.label!
   }
 }
 

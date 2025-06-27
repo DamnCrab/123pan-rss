@@ -7,6 +7,7 @@ export interface RSSSubscription {
   rssUrl: string
   folderPath: string
   folderName: string
+  cloudFolderName: string
   refreshInterval: number
   refreshUnit: 'minutes' | 'hours'
   isActive: number
@@ -19,13 +20,21 @@ export interface CreateRSSSubscriptionParams {
   rssUrl: string
   folderPath: string
   folderName: string
+  cloudFolderName: string
   refreshInterval: number
   refreshUnit: 'minutes' | 'hours'
   isActive?: boolean
 }
 
-export interface UpdateRSSSubscriptionParams extends Partial<CreateRSSSubscriptionParams> {
+export interface UpdateRSSSubscriptionParams {
   id: number
+  rssUrl?: string
+  folderPath?: string
+  folderName?: string
+  cloudFolderName?: string
+  refreshInterval?: number
+  refreshUnit?: 'minutes' | 'hours'
+  isActive?: boolean
 }
 
 // 获取RSS订阅列表
@@ -40,12 +49,18 @@ export const createRSSSubscription = (data: CreateRSSSubscriptionParams) => {
 
 // 更新RSS订阅
 export const updateRSSSubscription = (data: UpdateRSSSubscriptionParams) => {
-  return request.put(`/api/rss/${data.id}`, data)
+  const { id, ...updateData } = data
+  return request.put('/api/rss/update', updateData, { params: { id: id.toString() } })
 }
 
 // 删除RSS订阅
 export const deleteRSSSubscription = (id: number) => {
-  return request.delete(`/api/rss/${id}`)
+  return request.delete('/api/rss/remove', { params: { id: id.toString() } })
+}
+
+// 切换RSS订阅状态
+export const toggleRSSSubscription = (id: number) => {
+  return request.patch('/api/rss/toggle', {}, { params: { id: id.toString() } })
 }
 
 // 刷新RSS订阅
