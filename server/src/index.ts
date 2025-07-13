@@ -5,6 +5,7 @@ import user from "./api/user";
 import rss from "./api/rss";
 import magnet from "./api/magnet";
 import cloud123 from "./api/cloud123";
+import dashboard from "./api/dashboard";
 
 import openapi from "./middleware/openapi";
 import {cors} from 'hono/cors'
@@ -26,6 +27,7 @@ app.route('/api/user', user)
 app.route('/api/rss', rss)
 app.route('/api/magnet', magnet)
 app.route('/api/cloud123', cloud123)
+app.route('/api/dashboard', dashboard)
 
 app.notFound((c) => {
     return c.json(

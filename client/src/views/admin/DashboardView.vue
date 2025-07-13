@@ -52,29 +52,10 @@
     </n-grid>
 
     <!-- 可以添加更多仪表板内容，如图表、最近活动等 -->
-    <n-grid :cols="1" :lg-cols="2" :x-gap="16" :y-gap="16" class="mt-6">
+    <n-grid :cols="1" :x-gap="16" :y-gap="16" class="mt-6">
       <n-grid-item>
         <n-card title="最近RSS更新">
           <n-empty description="暂无最近更新" />
-        </n-card>
-      </n-grid-item>
-      
-      <n-grid-item>
-        <n-card title="系统状态">
-          <n-space vertical>
-            <div class="flex justify-between">
-              <span>系统运行时间</span>
-              <n-tag type="success">正常</n-tag>
-            </div>
-            <div class="flex justify-between">
-              <span>磁盘使用率</span>
-              <n-tag type="info">65%</n-tag>
-            </div>
-            <div class="flex justify-between">
-              <span>内存使用率</span>
-              <n-tag type="warning">78%</n-tag>
-            </div>
-          </n-space>
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -91,8 +72,7 @@ import {
   NH2,
   NIcon,
   NEmpty,
-  NSpace,
-  NTag
+  useMessage
 } from 'naive-ui'
 import {
   LogoRss,
@@ -100,24 +80,30 @@ import {
   TimeOutline,
   AlertCircleOutline
 } from '@vicons/ionicons5'
+import { getDashboardStats, type DashboardStats } from '@/api/dashboard'
 
-const stats = reactive({
+const message = useMessage()
+
+const stats = reactive<DashboardStats>({
   rssCount: 0,
   downloadCount: 0,
   pendingCount: 0,
-  failedCount: 0
+  failedCount: 0,
+  completedCount: 0,
+  downloadingCount: 0
 })
 
 const fetchStats = async () => {
   try {
-    // 这里可以添加获取统计数据的API调用
-    // 暂时使用模拟数据
-    stats.rssCount = 5
-    stats.downloadCount = 23
-    stats.pendingCount = 3
-    stats.failedCount = 1
+    const result = await getDashboardStats()
+    if (result.success && result.data) {
+      Object.assign(stats, result.data)
+    } else {
+      message.error(result.message || '获取统计数据失败')
+    }
   } catch (error) {
     console.error('获取统计数据失败:', error)
+    message.error('获取统计数据失败')
   }
 }
 
