@@ -1,0 +1,37 @@
+{
+  "name": "server",
+  "scripts": {
+    "dev-server": "wrangler dev",
+    "dev-server:remote": "wrangler dev --remote",
+    "deploy": "wrangler deploy --minify",
+    "build-frontend": "cd ../client && bun install && bun run build",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "deploy-with-frontend": "npm run build-frontend && wrangler deploy --minify",
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:migrate": "drizzle-kit migrate",
+    "drizzle:push": "drizzle-kit push",
+    "drizzle:check": "drizzle-kit check",
+    "drizzle:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.5.2",
+    "@hono/zod-validator": "^0.7.0",
+    "@libsql/client": "^0.15.9",
+    "@nerdfolio/drizzle-d1-helpers": "^0.1.4",
+    "@scalar/hono-api-reference": "^0.9.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.44.2",
+    "fast-xml-parser": "^5.2.5",
+    "hono": "^4.8.2",
+    "hono-openapi": "^0.4.8",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.25.67",
+    "zod-openapi": "^4.2.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "drizzle-kit": "^0.31.1",
+    "wrangler": "^4.4.0"
+  }
+}

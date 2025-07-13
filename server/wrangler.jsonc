@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "123pan-rss",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "pan123_client_id":"",
+    "pan123_client_secret":"",
+    "admin_password":""
+  },
+  "dev": {
+    "port": 8787
+  },
+  "assets": {
+    "directory": "../client/dist"
+  },
+  // "kv_namespaces": [
+  //   {
+  //     "binding": "MY_KV_NAMESPACE",
+  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  //   }
+  // ],
+  // "r2_buckets": [
+  //   {
+  //     "binding": "MY_BUCKET",
+  //     "bucket_name": "my-bucket"
+  //   }
+  // ],
+  "d1_databases": [
+    {
+      "binding": "database",
+      "database_name": "db_123",
+      "database_id": "3c75e529-45ee-4066-8dd6-e30f019db194",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  },
+  "triggers": {
+    "crons": [
+      "*/20 * * * *"
+    ]
+  }
+  // "ai": {
+  //   "binding": "AI"
+  // },
+  // "observability": {
+  //   "enabled": true,
+  //   "head_sampling_rate": 1
+  // }
+}
