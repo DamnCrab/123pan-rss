@@ -483,7 +483,8 @@ export async function createMagnetDownload(env: any, magnetLinkId: number): Prom
         return {
             success: false,
             magnetLinkId,
-            error: error instanceof Error ? error.message : '未知错误'
+            error: error instanceof Error ? error.message : '未知错误',
+            taskId: null
         }
     }
 }
@@ -494,7 +495,15 @@ export async function createMagnetDownload(env: any, magnetLinkId: number): Prom
  * @param magnetLinkId 磁力链接ID
  * @returns 重试结果
  */
-export async function retryMagnetDownload(env: any, magnetLinkId: number): Promise<{ success: boolean; magnetLinkId: number; error: string }> {
+export async function retryMagnetDownload(env: any, magnetLinkId: number): Promise<{ 
+    success: boolean; 
+    magnetLinkId: number; 
+    error: string;
+    currentStatus?: string;
+    previousStatus?: string;
+    newStatus?: string;
+    taskId?: any;
+}> {
     const database = db(env)
 
     try {
@@ -543,8 +552,7 @@ export async function retryMagnetDownload(env: any, magnetLinkId: number): Promi
                 downloadFailReason: null,
                 downloadCreatedAt: null,
                 downloadCompletedAt: null,
-                downloadFileId: null,
-                updatedAt: Date.now()
+                downloadFileId: null
             })
             .where(eq(magnetLinksTable.id, magnetLinkId))
 
@@ -556,7 +564,7 @@ export async function retryMagnetDownload(env: any, magnetLinkId: number): Promi
         return {
             success: createResult.success,
             magnetLinkId,
-            previousStatus: link.downloadStatus,
+            previousStatus: link.downloadStatus || undefined,
             newStatus: createResult.success ? 'downloading' : 'failed',
             taskId: createResult.taskId,
             error: createResult.error

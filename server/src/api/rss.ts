@@ -10,7 +10,7 @@ import {rssSubscriptionsTable} from "../db/schema";
 
 import {responseSchema} from "../utils/responseSchema";
 import {createFolder} from "../utils/cloud123";
-import {updateSingleRSS} from "../utils/rss";
+import {updateSingleRSS, updateAllRSS} from "../utils/rss";
 import {magnetLinksTable} from "../db/schema";
 import {handleError} from '../utils/errorHandler';
 import {rssUpdateRateLimit} from '../middleware/rateLimiter';
@@ -139,6 +139,16 @@ app.post('/',
                 createdAt: now,
                 updatedAt: now
             }).returning()
+
+            // 创建RSS订阅成功后，立即触发RSS更新
+            try {
+                console.log('RSS订阅创建成功，开始更新RSS内容...')
+                await updateAllRSS(c.env, true) // 强制更新
+                console.log('RSS内容更新完成')
+            } catch (updateError) {
+                console.error('RSS内容更新失败:', updateError)
+                // 不影响RSS订阅创建的成功响应
+            }
 
             return c.json({
                 success: true,

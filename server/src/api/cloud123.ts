@@ -245,10 +245,6 @@ app.post('/offline/retry',
                 whereConditions.push(inArray(magnetLinksTable.rssSubscriptionId, rssSubscriptionIds));
             }
 
-            const query = database
-                .select()
-                .from(magnetLinksTable)
-                .where(and(...whereConditions));
 
             // 需要JOIN查询获取RSS订阅信息以获取cloudFolderId
             // 构建where条件数组
