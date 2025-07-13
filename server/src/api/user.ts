@@ -9,6 +9,7 @@ import {setCookie} from 'hono/cookie';
 import {hashPassword, jwtMiddleware, signUserJwt, verifyPassword} from '../middleware/jwt';
 import {usersTable} from "../db/schema";
 import {responseSchema} from "../utils/responseSchema";
+import {apiResponseSchema, userInfoSchema, loginResultSchema} from "../utils/openApiSchemas";
 import {handleError, createErrorResponse} from '../utils/errorHandler';
 import {loginRateLimit} from '../middleware/rateLimiter';
 
@@ -83,7 +84,7 @@ app.post('/login',
         tags: ['用户'],
         summary: '用户登录',
         description: '使用用户名和密码进行登录，成功后返回JWT token',
-        responses: responseSchema()
+        responses: responseSchema(loginResultSchema)
     }),
     zValidator('json', loginSchema), async (c) => {
         const {username, password} = c.req.valid('json')
@@ -162,16 +163,7 @@ app.get('/profile',
         summary: '获取当前用户信息',
         description: '获取当前登录用户的基本信息',
         security: [{bearerAuth: []}],
-        responses: responseSchema(z.object({
-            id: z.number(),
-            username: z.string()
-        }).openapi({
-            ref: 'UserProfile',
-            example: {
-                id: 1,
-                username: 'admin'
-            }
-        }))
+        responses: responseSchema(userInfoSchema)
     }),
     jwtMiddleware,
     async (c) => {

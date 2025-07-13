@@ -159,9 +159,10 @@ import {
   getRSSSubscriptions,
   toggleRSSSubscription
 } from '@/api/rss'
-import { refreshRSSSubscription } from '@/api/magnet'
+import { triggerRSSUpdate } from '@/api/magnet'
 import MagnetLinksModal from '@/components/MagnetLinksModal.vue'
 import RssFormModal from '@/components/RssFormModal.vue'
+import type { TimeUnit } from '@/api/types'
 
 interface RssSubscription {
   id: number
@@ -170,11 +171,11 @@ interface RssSubscription {
   fatherFolderName: string
   cloudFolderName: string
   refreshInterval: number
-  refreshUnit: 'minutes' | 'hours'
+  refreshUnit: TimeUnit
   isActive: number
-  lastRefresh?: string
-  createdAt: string
-  updatedAt: string
+  lastRefresh: number | null
+  createdAt: number
+  updatedAt: number
 }
 
 // 移除了FormData和FolderCascaderOption接口定义
@@ -196,8 +197,8 @@ const fetchRssList = async () => {
   try {
     loading.value = true
     const result = await getRSSSubscriptions()
-    if (result.success) {
-      rssList.value = result.data
+    if (result.success && result.data) {
+      rssList.value = result.data.list
     } else {
       message.error(result.message || '获取RSS列表失败')
     }
@@ -266,8 +267,8 @@ const toggleRssStatus = async (rss: RssSubscription) => {
 // 移除了不再需要的表单相关函数
 
 // 格式化日期
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString('zh-CN')
+const formatDate = (timestamp: number | string) => {
+  return new Date(timestamp).toLocaleString('zh-CN')
 }
 
 // 打开磁力链接管理弹窗
@@ -281,7 +282,7 @@ const openMagnetModal = (rss: RssSubscription) => {
 const handleRefreshAll = async () => {
   try {
     refreshingAll.value = true
-    const result = await refreshRSSSubscription()
+    const result = await triggerRSSUpdate()
     
     if (result.success) {
       message.success(result.message || '刷新成功')

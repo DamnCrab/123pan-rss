@@ -7,6 +7,7 @@ import { db } from "../db";
 import { eq, inArray, and } from 'drizzle-orm';
 import {  magnetLinksTable, rssSubscriptionsTable } from "../db/schema";
 import { responseSchema } from "../utils/responseSchema";
+import { paginationQuerySchema, batchOperationSchema, operationResultSchema, fileTypeSchema } from "../utils/openApiSchemas";
 import { jwtMiddleware } from '../middleware/jwt';
 import { getAccessToken, getFileList} from "../utils/cloud123";
 import {retryMagnetDownload} from "../utils/rss";

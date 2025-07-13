@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiResponse, FileType, BatchParams } from './types'
 
 // 123云盘配置接口
 export interface Cloud123Config {
@@ -18,7 +19,7 @@ export interface Cloud123Status {
 export interface FileInfo {
   fileId: number
   filename: string
-  type: number // 0-文件，1-文件夹
+  type: FileType // 0-文件，1-文件夹
   size: number
   etag: string
   status: number
@@ -56,41 +57,41 @@ export interface CreateFolderParams {
 }
 
 // 获取123云盘配置
-export const getCloud123Config = () => {
-  return request.get<Cloud123Config>('/api/cloud123/config')
+export const getCloud123Config = (): Promise<ApiResponse<Cloud123Config>> => {
+  return request.get('/api/cloud123/config')
 }
 
 // 获取123云盘状态
-export const getCloud123Status = () => {
-  return request.get<Cloud123Status>('/api/cloud123/status')
+export const getCloud123Status = (): Promise<ApiResponse<Cloud123Status>> => {
+  return request.get('/api/cloud123/status')
 }
 
 // 配置123云盘客户端信息
-export const configCloud123 = (data: ConfigCloud123Params) => {
+export const configCloud123 = (data: ConfigCloud123Params): Promise<ApiResponse> => {
   return request.post('/api/cloud123/config', data)
 }
 
 // 获取文件列表
-export const getFileList = (params?: FileListQuery) => {
-  return request.get<FileListResponse>('/api/cloud123/files', { params })
+export const getFileList = (params?: FileListQuery): Promise<ApiResponse<FileListResponse>> => {
+  return request.get('/api/cloud123/files', { params })
 }
 
 // 创建文件夹
-export const createFolder = (data: CreateFolderParams) => {
+export const createFolder = (data: CreateFolderParams): Promise<ApiResponse<FileInfo>> => {
   return request.post('/api/cloud123/folder', data)
 }
 
 // 删除文件
-export const deleteFiles = (fileIds: number[]) => {
+export const deleteFiles = (fileIds: number[]): Promise<ApiResponse> => {
   return request.delete('/api/cloud123/files', { data: { fileIds } })
 }
 
 // 移动文件到回收站
-export const trashFiles = (fileIds: number[]) => {
+export const trashFiles = (fileIds: number[]): Promise<ApiResponse> => {
   return request.post('/api/cloud123/trash', { fileIds })
 }
 
 // 从回收站恢复文件
-export const restoreFiles = (fileIds: number[]) => {
+export const restoreFiles = (fileIds: number[]): Promise<ApiResponse> => {
   return request.post('/api/cloud123/restore', { fileIds })
 }

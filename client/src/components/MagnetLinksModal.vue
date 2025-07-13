@@ -73,6 +73,14 @@
         </n-space>
         <n-space>
           <n-button
+            type="primary"
+            size="small"
+            :loading="downloadingAll"
+            @click="handleDownloadAll"
+          >
+            下载全部
+          </n-button>
+          <n-button
             type="error"
             size="small"
             :disabled="!hasSelected"
@@ -132,10 +140,11 @@ import {
 } from '@vicons/ionicons5'
 import {
   getMagnetLinks,
-  refreshRSSSubscription,
+  triggerRSSUpdate,
   deleteMagnetLink,
   createOfflineDownload,
   batchRetryDownload,
+  downloadAllPendingMagnets,
   type MagnetLink, type MagnetListQuery
 } from '@/api/magnet'
 import {useDebounceFn} from "@vueuse/core";
@@ -160,6 +169,7 @@ const magnetLinks = ref<MagnetLink[]>([])
 const loading = ref(false)
 const refreshing = ref(false)
 const retryingRss = ref(false)
+const downloadingAll = ref(false)
 const total = ref(0)
 const checkedRowKeys = ref<DataTableRowKey[]>([])
 
@@ -328,7 +338,7 @@ const fetchMagnetLinks = async () => {
   try {
     loading.value = true
     const params: MagnetListQuery = {
-      pageNum: paginationReactive.page.toString(),
+      page: paginationReactive.page.toString(),
       pageSize: paginationReactive.pageSize.toString()
     }
     
@@ -373,7 +383,7 @@ const handleRefreshRSS = async () => {
   
   try {
     refreshing.value = true
-    const result = await refreshRSSSubscription(props.rssId)
+    const result = await triggerRSSUpdate(props.rssId)
     if (result.success) {
       message.success('RSS刷新成功')
       await fetchMagnetLinks()
@@ -505,6 +515,32 @@ const handleBatchDelete = () => {
       }
     }
   })
+}
+
+// 下载当前RSS内所有未下载的种子
+const handleDownloadAll = async () => {
+  if (!props.rssId) {
+    message.error('RSS ID不存在')
+    return
+  }
+
+  try {
+    downloadingAll.value = true
+    
+    // 调用后端API批量下载该RSS下所有pending状态的磁力链接
+    const result = await downloadAllPendingMagnets(props.rssId)
+    
+    if (result.success) {
+      message.success(result.message)
+      await fetchMagnetLinks()
+    } else {
+      message.error(result.message || '批量下载任务创建失败')
+    }
+  } catch (error) {
+    message.error('网络错误，请稍后重试')
+  } finally {
+    downloadingAll.value = false
+  }
 }
 
 // 搜索处理

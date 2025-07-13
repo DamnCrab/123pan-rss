@@ -331,7 +331,7 @@ const fetchAccountInfo = async () => {
       credentials: 'include'
     })
     const result = await response.json()
-    if (result.success) {
+    if (result.success && result.data) {
       accountStatus.value = result.data.connected ? 'connected' : 'disconnected'
       storageInfo.used = result.data.used || '0 GB'
       storageInfo.total = result.data.total || '0 GB'
@@ -349,7 +349,7 @@ const fetchTasks = async () => {
       credentials: 'include'
     })
     const result = await response.json()
-    if (result.success) {
+    if (result.success && result.data) {
       tasks.value = result.data.tasks || []
       // pagination.itemCount = result.data.total || 0
     } else {

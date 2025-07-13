@@ -6,6 +6,7 @@ import {db} from '../db'
 import {eq, count, and} from 'drizzle-orm'
 import {rssSubscriptionsTable, magnetLinksTable} from '../db/schema'
 import {responseSchema} from '../utils/responseSchema'
+import {statsDataSchema} from '../utils/openApiSchemas'
 import {jwtMiddleware} from '../middleware/jwt'
 import {handleError, createErrorResponse, ErrorType} from '../utils/errorHandler'
 

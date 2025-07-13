@@ -108,6 +108,7 @@ import {
   updateRSSSubscription,
   type UpdateRSSSubscriptionParams
 } from '@/api/rss'
+import type { TimeUnit } from '@/api/types'
 
 interface RssSubscription {
   id: number
@@ -116,8 +117,11 @@ interface RssSubscription {
   fatherFolderName: string
   cloudFolderName: string
   refreshInterval: number
-  refreshUnit: 'minutes' | 'hours'
-  isActive: boolean
+  refreshUnit: TimeUnit
+  isActive: number
+  lastRefresh: number | null
+  createdAt: number
+  updatedAt: number
 }
 
 interface FormData {
@@ -126,7 +130,7 @@ interface FormData {
   fatherFolderName: string
   cloudFolderName: string
   refreshInterval: number
-  refreshUnit: 'minutes' | 'hours'
+  refreshUnit: TimeUnit
   isActive: boolean
 }
 
@@ -303,6 +307,11 @@ const fetchFolders = async (parentFileId: number = 0): Promise<FolderCascaderOpt
       }
 
       const result = await getFileList(query)
+
+      // 检查result.data是否存在
+      if (!result.data) {
+        break
+      }
 
       // 只筛选文件夹类型的数据 (type === 1)
       const folders = result.data.fileList

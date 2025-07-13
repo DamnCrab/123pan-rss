@@ -1,7 +1,8 @@
 import request from './request'
+import type { ApiResponse, StatsData } from './types'
 
 // Dashboard统计数据接口
-export interface DashboardStats {
+export interface DashboardStats extends StatsData {
   rssCount: number
   downloadCount: number
   pendingCount: number
@@ -11,6 +12,6 @@ export interface DashboardStats {
 }
 
 // 获取Dashboard统计数据
-export const getDashboardStats = () => {
-  return request.get<DashboardStats>('/api/dashboard/stats')
+export const getDashboardStats = (): Promise<ApiResponse<DashboardStats>> => {
+  return request.get('/api/dashboard/stats')
 }

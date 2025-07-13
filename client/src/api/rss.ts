@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiResponse, PaginatedResponse, PaginationParams, SearchParams, DateRangeParams, TimeUnit, Status } from './types'
 
 // RSS订阅接口
 export interface RSSSubscription {
@@ -9,8 +10,8 @@ export interface RSSSubscription {
   fatherFolderName: string
   cloudFolderName: string
   refreshInterval: number
-  refreshUnit: 'minutes' | 'hours'
-  isActive: number
+  refreshUnit: TimeUnit
+  isActive: Status
   lastRefresh: number | null
   createdAt: number
   updatedAt: number
@@ -22,7 +23,7 @@ export interface CreateRSSSubscriptionParams {
   fatherFolderName: string
   cloudFolderName: string
   refreshInterval: number
-  refreshUnit: 'minutes' | 'hours'
+  refreshUnit: TimeUnit
   isActive?: boolean
 }
 
@@ -33,38 +34,38 @@ export interface UpdateRSSSubscriptionParams {
   fatherFolderName?: string
   cloudFolderName?: string
   refreshInterval?: number
-  refreshUnit?: 'minutes' | 'hours'
+  refreshUnit?: TimeUnit
   isActive?: boolean
 }
 
 // 获取RSS订阅列表
-export const getRSSSubscriptions = (params?: { page?: number; limit?: number; search?: string }) => {
+export const getRSSSubscriptions = (params?: PaginationParams & SearchParams): Promise<ApiResponse<PaginatedResponse<RSSSubscription>>> => {
   return request.get('/api/rss', { params })
 }
 
 // 创建RSS订阅
-export const createRSSSubscription = (data: CreateRSSSubscriptionParams) => {
+export const createRSSSubscription = (data: CreateRSSSubscriptionParams): Promise<ApiResponse<RSSSubscription>> => {
   return request.post('/api/rss', data)
 }
 
 // 更新RSS订阅
-export const updateRSSSubscription = (data: UpdateRSSSubscriptionParams) => {
+export const updateRSSSubscription = (data: UpdateRSSSubscriptionParams): Promise<ApiResponse<RSSSubscription>> => {
   const { id, ...updateData } = data
   return request.put('/api/rss/update', updateData, { params: { id: id.toString() } })
 }
 
 // 删除RSS订阅
-export const deleteRSSSubscription = (id: number) => {
+export const deleteRSSSubscription = (id: number): Promise<ApiResponse> => {
   return request.delete('/api/rss/remove', { params: { id: id.toString() } })
 }
 
 // 切换RSS订阅状态
-export const toggleRSSSubscription = (id: number) => {
+export const toggleRSSSubscription = (id: number): Promise<ApiResponse> => {
   return request.patch('/api/rss/toggle', {}, { params: { id: id.toString() } })
 }
 
 // 刷新RSS订阅
-export const refreshRSSSubscription = (id: number) => {
+export const refreshRSSSubscription = (id: number): Promise<ApiResponse> => {
   return request.post(`/api/rss/${id}/refresh`)
 }
 
@@ -81,18 +82,8 @@ export interface RSSItem {
 }
 
 // 获取RSS条目列表
-export const getRSSItems = (params?: {
-  page?: number
-  pageSize?: number
+export const getRSSItems = (params?: PaginationParams & SearchParams & DateRangeParams & {
   sourceId?: number
-  keyword?: string
-  startDate?: string
-  endDate?: string
-}) => {
-  return request.get<{
-    list: RSSItem[]
-    total: number
-    page: number
-    pageSize: number
-  }>('/api/rss/items', { params })
+}): Promise<ApiResponse<PaginatedResponse<RSSItem>>> => {
+  return request.get('/api/rss/items', { params })
 }

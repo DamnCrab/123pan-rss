@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiResponse, LoginResult, UserInfo } from './types'
 
 // 用户登录
 export interface LoginParams {
@@ -6,38 +7,17 @@ export interface LoginParams {
   password: string
 }
 
-export interface LoginResponse {
-  success: boolean
-  message: string
-  data: {
-    token: string
-    user: {
-      id: number
-      username: string
-    }
-  }
-}
-
-export const login = (data: LoginParams) => {
-  return request.post<LoginResponse>('/api/user/login', data)
+export const login = (data: LoginParams): Promise<ApiResponse<LoginResult>> => {
+  return request.post('/api/user/login', data)
 }
 
 // 获取用户信息
-export interface UserProfile {
-  success: boolean
-  message: string
-  data: {
-    id: number
-    username: string
-  }
-}
-
-export const getUserProfile = () => {
-  return request.get<UserProfile>('/api/user/profile')
+export const getUserProfile = (): Promise<ApiResponse<UserInfo>> => {
+  return request.get('/api/user/profile')
 }
 
 // 用户登出
-export const logout = () => {
+export const logout = (): Promise<ApiResponse> => {
   return request.post('/api/user/logout')
 }
 
@@ -47,6 +27,6 @@ export interface ChangePasswordParams {
   newPassword: string
 }
 
-export const changePassword = (data: ChangePasswordParams) => {
+export const changePassword = (data: ChangePasswordParams): Promise<ApiResponse> => {
   return request.post('/api/user/change-password', data)
 }

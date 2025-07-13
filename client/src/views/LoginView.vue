@@ -93,7 +93,7 @@ const handleLogin = async () => {
 
     const result = await login(loginForm)
 
-    if (result.success) {
+    if (result.success && result.data) {
       // 保存token到localStorage
       localStorage.setItem('token', result.data.token)
 

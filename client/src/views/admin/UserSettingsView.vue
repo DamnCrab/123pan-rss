@@ -279,7 +279,7 @@ const fetchUserProfile = async () => {
       credentials: 'include'
     })
     const result = await response.json()
-    if (result.success) {
+    if (result.success && result.data) {
       Object.assign(profileForm, result.data)
     }
   } catch (error) {
@@ -293,7 +293,7 @@ const fetchSystemSettings = async () => {
       credentials: 'include'
     })
     const result = await response.json()
-    if (result.success) {
+    if (result.success && result.data) {
       Object.assign(systemForm, result.data)
     }
   } catch (error) {

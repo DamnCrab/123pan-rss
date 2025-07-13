@@ -1,7 +1,7 @@
 import {XMLParser} from 'fast-xml-parser'
 import {db} from "../db";
 import {magnetLinksTable, rssSubscriptionsTable} from '../db/schema';
-import {eq} from "drizzle-orm";
+import {eq, and} from "drizzle-orm";
 import {createOfflineDownload, getOfflineDownloadProgress} from "./cloud123";
 
 // RSS相关的类型定义
@@ -21,20 +21,6 @@ export interface RSSUpdateResult {
     subscriptionId: number
     newItems?: number
     skipped?: boolean
-    error?: string
-}
-
-export interface MagnetDownloadResult {
-    success: boolean
-    magnetId: number
-    taskId?: string
-    error?: string
-}
-
-export interface MagnetRetryResult {
-    success: boolean
-    magnetId: number
-    taskId?: string
     error?: string
 }
 
@@ -161,7 +147,7 @@ function validateAndCleanRSSItems(items: RSSItem[]): RSSItem[] {
 // ==================== 核心功能函数 ====================
 
 /**
- * 1. 更新单个RSS订阅
+ * 更新单个RSS订阅
  * @param env Cloudflare环境变量
  * @param subscriptionId RSS订阅ID
  * @param forced 是否强制更新（忽略时间间隔）
@@ -279,7 +265,7 @@ export async function updateSingleRSS(env: any, subscriptionId: number, forced: 
 }
 
 /**
- * 2. 更新所有RSS订阅
+ * 更新所有RSS订阅
  * @param env Cloudflare环境变量
  * @param forced 是否强制更新（忽略时间间隔）
  * @param concurrencyLimit 并发限制数量
@@ -376,7 +362,7 @@ export async function updateAllRSS(env: any, forced: boolean = false, concurrenc
 }
 
 /**
- * 3. 创建一个磁力链接的下载任务
+ * 创建一个磁力链接的下载任务
  * @param env Cloudflare环境变量
  * @param magnetLinkId 磁力链接ID
  * @returns 下载创建结果
@@ -490,7 +476,7 @@ export async function createMagnetDownload(env: any, magnetLinkId: number): Prom
 }
 
 /**
- * 4. 重试一个磁力链接的下载
+ * 重试一个磁力链接的下载
  * @param env Cloudflare环境变量
  * @param magnetLinkId 磁力链接ID
  * @returns 重试结果
@@ -577,6 +563,114 @@ export async function retryMagnetDownload(env: any, magnetLinkId: number): Promi
             magnetLinkId,
             error: error instanceof Error ? error.message : '未知错误'
         }
+    }
+}
+
+/**
+ * 批量下载未下载的磁力链接
+ * @param env Cloudflare环境变量
+ * @param concurrencyLimit 并发限制，默认为3
+ * @param rssId 可选的RSS ID，如果提供则只下载该RSS的磁力链接，否则下载所有RSS的磁力链接
+ * @returns 批量下载结果
+ */
+export async function downloadAllPendingMagnets(env: any, concurrencyLimit: number = 3, rssId?: number): Promise<{
+    total: number
+    success: number
+    failed: number
+    skipped: number
+    results: Array<{ magnetLinkId: number; success: boolean; error?: string; taskId?: any }>
+}> {
+    const database = db(env)
+    
+    try {
+        // 构建查询条件
+        let whereConditions = [eq(magnetLinksTable.downloadStatus, 'pending')]
+        
+        // 如果提供了rssId，则添加RSS过滤条件
+        if (rssId !== undefined) {
+            whereConditions.push(eq(magnetLinksTable.rssSubscriptionId, rssId))
+        }
+        
+        // 获取符合条件的磁力链接
+        const pendingMagnets = await database
+            .select()
+            .from(magnetLinksTable)
+            .where(and(...whereConditions))
+        
+        console.log(`找到 ${pendingMagnets.length} 个待下载的磁力链接`)
+        
+        if (pendingMagnets.length === 0) {
+            return {
+                total: 0,
+                success: 0,
+                failed: 0,
+                skipped: 0,
+                results: []
+            }
+        }
+        
+        const results: Array<{ magnetLinkId: number; success: boolean; error?: string; taskId?: any }> = []
+        let successCount = 0
+        let failedCount = 0
+        let skippedCount = 0
+        
+        // 分批处理，避免并发过多
+        for (let i = 0; i < pendingMagnets.length; i += concurrencyLimit) {
+            const batch = pendingMagnets.slice(i, i + concurrencyLimit)
+            
+            const batchPromises = batch.map(async (magnet) => {
+                try {
+                    const result = await createMagnetDownload(env, magnet.id)
+                    
+                    if (result.success) {
+                        successCount++
+                        console.log(`磁力链接 ${magnet.id} 下载任务创建成功`)
+                    } else {
+                        failedCount++
+                        console.log(`磁力链接 ${magnet.id} 下载任务创建失败: ${result.error}`)
+                    }
+                    
+                    return {
+                        magnetLinkId: magnet.id,
+                        success: result.success,
+                        error: result.error,
+                        taskId: result.taskId
+                    }
+                } catch (error) {
+                    failedCount++
+                    const errorMessage = error instanceof Error ? error.message : '未知错误'
+                    console.error(`磁力链接 ${magnet.id} 下载任务创建异常:`, error)
+                    
+                    return {
+                        magnetLinkId: magnet.id,
+                        success: false,
+                        error: errorMessage
+                    }
+                }
+            })
+            
+            const batchResults = await Promise.all(batchPromises)
+            results.push(...batchResults)
+            
+            // 批次间稍作延迟，避免对API造成过大压力
+            if (i + concurrencyLimit < pendingMagnets.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000))
+            }
+        }
+        
+        console.log(`批量下载完成: 总计 ${pendingMagnets.length}, 成功 ${successCount}, 失败 ${failedCount}, 跳过 ${skippedCount}`)
+        
+        return {
+            total: pendingMagnets.length,
+            success: successCount,
+            failed: failedCount,
+            skipped: skippedCount,
+            results
+        }
+        
+    } catch (error) {
+        console.error('批量下载磁力链接异常:', error)
+        throw error
     }
 }
 

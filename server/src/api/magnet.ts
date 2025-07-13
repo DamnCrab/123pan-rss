@@ -7,7 +7,8 @@ import {db} from '../db'
 import {eq, and} from 'drizzle-orm'
 import {magnetLinksTable} from '../db/schema'
 import {responseSchema} from '../utils/responseSchema'
-import {updateAllRSS, updateSingleRSS, createMagnetDownload} from "../utils/rss";
+import {paginationQuerySchema, idQuerySchema, downloadStatusSchema, operationResultSchema} from '../utils/openApiSchemas'
+import {updateAllRSS, updateSingleRSS, createMagnetDownload, downloadAllPendingMagnets} from "../utils/rss";
 import {getOfflineDownloadProgress} from "../utils/cloud123";
 import {jwtMiddleware} from '../middleware/jwt';
 import {handleError, createErrorResponse, ErrorType} from '../utils/errorHandler';
@@ -33,7 +34,7 @@ const magnetLinkSchema = z.object({
     createdAt: z.number().describe('创建时间 (时间戳)'),
     // 离线下载相关字段
     downloadTaskId: z.string().nullable().describe('123云盘离线下载任务ID'),
-    downloadStatus: z.string().describe('下载状态: pending, downloading, completed, failed'),
+    downloadStatus: downloadStatusSchema.describe('下载状态'),
     downloadFileId: z.string().nullable().describe('下载完成后的文件ID'),
     downloadFailReason: z.string().nullable().describe('下载失败原因'),
     downloadCreatedAt: z.number().nullable().describe('创建下载任务时间'),
@@ -62,15 +63,13 @@ const magnetLinkSchema = z.object({
 })
 
 // 磁力链接列表查询参数schema
-const magnetListQuerySchema = z.object({
-    rssId: z.string().optional().describe('RSS订阅ID，筛选特定RSS的磁力链接'),
-    pageNum: z.string().optional().describe('页码，从1开始，默认1'),
-    pageSize: z.string().optional().describe('每页数量，默认50')
+const magnetListQuerySchema = paginationQuerySchema.extend({
+    rssId: z.string().optional().describe('RSS订阅ID，筛选特定RSS的磁力链接')
 }).openapi({
     ref: 'MagnetListQuery',
     example: {
         rssId: '1',
-        pageNum: '1',
+        page: '1',
         pageSize: '50'
     }
 })
@@ -174,7 +173,7 @@ app.get('/list',
                 }
             },
             {
-                name: 'pageNum',
+                name: 'page',
                 in: 'query',
                 required: false,
                 description: '页码，从1开始，默认1',
@@ -199,28 +198,29 @@ app.get('/list',
     zValidator('query', magnetListQuerySchema), async (c) => {
         try {
             const database = db(c.env)
-            const {rssId, pageNum: pageNumStr, pageSize: pageSizeStr} = c.req.valid('query')
-            const pageNum = parseInt(pageNumStr || '1')
-            const pageSize = parseInt(pageSizeStr || '50')
+            const {rssId, page, pageNum, pageSize: pageSizeNum} = c.req.valid('query')
+            // 兼容pageNum参数，优先使用page
+            const currentPage = page || pageNum || 1
+            const currentPageSize = pageSizeNum || 50
 
             // 验证分页参数
-            if (pageSize < 1 || pageSize > 100) {
+            if (currentPageSize < 1 || currentPageSize > 100) {
                 return c.json({
                     success: false,
                     message: 'pageSize参数必须在1-100之间'
                 }, 200)
             }
 
-            if (pageNum < 1) {
+            if (currentPage < 1) {
                 return c.json({
                     success: false,
-                    message: 'pageNum参数必须大于0'
+                    message: 'page参数必须大于0'
                 }, 200)
             }
 
             // 计算limit和offset
-            const limit = pageSize
-            const offset = (pageNum - 1) * pageSize
+            const limit = currentPageSize
+            const offset = (currentPage - 1) * currentPageSize
 
             // 构建基础查询
             // 构建where条件数组
@@ -425,6 +425,83 @@ app.post('/download/:id',
             }
         } catch (error) {
             return handleError(error, c, '创建下载任务失败');
+        }
+    })
+
+// 批量下载待下载的磁力链接
+app.post('/download-all-pending',
+    describeRoute({
+        tags: ['磁力链接管理'],
+        summary: '批量下载待下载的磁力链接',
+        description: '为所有状态为pending的磁力链接创建123云盘离线下载任务。如果提供rssId，则只下载该RSS订阅下的磁力链接；否则下载所有RSS的磁力链接',
+        requestBody: {
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            rssId: {
+                                type: 'number',
+                                description: '可选的RSS订阅ID，如果提供则只下载该RSS的磁力链接'
+                            }
+                        },
+                        example: {
+                            rssId: 1
+                        }
+                    }
+                }
+            }
+        },
+        responses: responseSchema(z.object({
+            success: z.boolean(),
+            message: z.string(),
+            data: z.object({
+                total: z.number().describe('总数'),
+                success: z.number().describe('成功数'),
+                failed: z.number().describe('失败数'),
+                skipped: z.number().describe('跳过数'),
+                results: z.array(z.object({
+                    magnetLinkId: z.number(),
+                    success: z.boolean(),
+                    error: z.string().optional(),
+                    taskId: z.any().optional()
+                }))
+            })
+        }).openapi({
+            ref: 'DownloadAllPendingResponse',
+            example: {
+                success: true,
+                message: '批量下载任务创建完成',
+                data: {
+                    total: 10,
+                    success: 8,
+                    failed: 2,
+                    skipped: 0,
+                    results: []
+                }
+            }
+        }))
+    }),
+    zValidator('json', z.object({
+        rssId: z.number().optional()
+    })),
+    async (c) => {
+        try {
+            const { rssId } = c.req.valid('json')
+            
+            // 设置并发限制为后端配置
+            const concurrencyLimit = 3
+            
+            // 直接调用批量下载函数，传入rssId参数
+            const result = await downloadAllPendingMagnets(c.env, concurrencyLimit, rssId)
+            
+            return c.json({
+                success: true,
+                message: `批量下载完成: 总计 ${result.total}, 成功 ${result.success}, 失败 ${result.failed}`,
+                data: result
+            })
+        } catch (error) {
+            return handleError(error, c, '批量下载任务创建失败');
         }
     })
 

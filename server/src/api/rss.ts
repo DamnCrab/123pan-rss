@@ -9,6 +9,7 @@ import {eq, and, like, SQL} from 'drizzle-orm';
 import {rssSubscriptionsTable} from "../db/schema";
 
 import {responseSchema} from "../utils/responseSchema";
+import {searchQuerySchema, idQuerySchema, timeUnitSchema, paginatedResponseSchema} from "../utils/openApiSchemas";
 import {createFolder} from "../utils/cloud123";
 import {updateSingleRSS, updateAllRSS} from "../utils/rss";
 import {magnetLinksTable} from "../db/schema";
@@ -27,9 +28,7 @@ const rssSchema = z.object({
     fatherFolderName: z.string().min(1, '父文件夹名称不能为空'),
     cloudFolderName: z.string().min(1, '云盘文件夹名称不能为空'),
     refreshInterval: z.number().min(1, '刷新间隔必须大于0'),
-    refreshUnit: z.enum(['minutes', 'hours'], {
-        errorMap: () => ({message: '刷新单位只能是minutes或hours'})
-    }).default('minutes'),
+    refreshUnit: timeUnitSchema.default('minutes'),
     isActive: z.boolean().default(true)
 }).openapi({
     ref: 'RssSubscriptionRequest',
@@ -53,7 +52,7 @@ const rssSubscriptionSchema = z.object({
     fatherFolderName: z.string().describe('父文件夹名称'),
     cloudFolderName: z.string().describe('云盘文件夹名称'),
     refreshInterval: z.number().describe('刷新间隔，单位：分钟'),
-    refreshUnit: z.enum(['minutes', 'hours']).describe('刷新单位，minutes或hours'),
+    refreshUnit: timeUnitSchema.describe('刷新单位'),
     isActive: z.number().describe('订阅状态，1: 激活, 0: 停用'),
     lastRefresh: z.number().nullable().describe('最后刷新时间 (时间戳)'),
     createdAt: z.number().describe('创建时间 (时间戳)'),
@@ -76,24 +75,7 @@ const rssSubscriptionSchema = z.object({
     }
 })
 
-// 查询参数验证schema
-const searchQuerySchema = z.object({
-    search: z.string().optional().describe('按文件夹名称搜索')
-}).openapi({
-    ref: 'SearchQuery',
-    example: {
-        search: '动漫'
-    }
-})
-
-const idQuerySchema = z.object({
-    id: z.string().regex(/^\d+$/, 'ID必须是有效的数字').describe('RSS订阅ID')
-}).openapi({
-    ref: 'IdQuery',
-    example: {
-        id: '1'
-    }
-})
+// 使用通用的查询参数schema
 
 
 // 添加RSS订阅

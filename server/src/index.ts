@@ -12,7 +12,7 @@ import {generalRateLimit} from "./middleware/rateLimiter";
 import {cors} from 'hono/cors'
 import {csrf} from 'hono/csrf'
 import {refreshTokenIfNeeded} from "./utils/cloud123";
-import {updateAllRSS} from "./utils/rss";
+import {updateAllRSS, downloadAllPendingMagnets} from "./utils/rss";
 
 const app = new Hono()
 
@@ -60,7 +60,12 @@ export default {
             await refreshTokenIfNeeded(env)
 
             // 处理RSS订阅
-            await updateAllRSS(env)
+            const rssResult = await updateAllRSS(env)
+            console.log(`RSS更新完成: 总计 ${rssResult.total}, 成功 ${rssResult.success}, 失败 ${rssResult.failed}, 跳过 ${rssResult.skipped}, 新增条目 ${rssResult.totalNewItems}`)
+
+            // 下载所有未下载的磁力链接
+            const downloadResult = await downloadAllPendingMagnets(env)
+            console.log(`磁力链接下载完成: 总计 ${downloadResult.total}, 成功 ${downloadResult.success}, 失败 ${downloadResult.failed}, 跳过 ${downloadResult.skipped}`)
 
             console.log('定时任务执行成功')
         } catch (error) {
