@@ -7,10 +7,10 @@
     "nodejs_compat"
   ],
   "vars": {
-    "ENVIRONMENT": "production",
-    "pan123_client_id":"",
-    "pan123_client_secret":"",
-    "admin_password":""
+    "ENVIRONMENT": "production"
+//    "pan123_client_id":"",
+//    "pan123_client_secret":"",
+//    "admin_password":""
   },
   "dev": {
     "port": 8787
