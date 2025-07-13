@@ -8,6 +8,7 @@ import cloud123 from "./api/cloud123";
 import dashboard from "./api/dashboard";
 
 import openapi from "./middleware/openapi";
+import {generalRateLimit} from "./middleware/rateLimiter";
 import {cors} from 'hono/cors'
 import {csrf} from 'hono/csrf'
 import {refreshTokenIfNeeded} from "./utils/cloud123";
@@ -23,6 +24,9 @@ app.use('*', cors({
 }));
 // app.use(csrf())
 
+// 应用全局速率限制 - 每15分钟100次请求
+app.use('/api/*', generalRateLimit)
+
 app.route('/api/user', user)
 app.route('/api/rss', rss)
 app.route('/api/magnet', magnet)
@@ -32,7 +36,7 @@ app.route('/api/dashboard', dashboard)
 app.notFound((c) => {
     return c.json(
         {
-            error: "Not Found",
+            success: false,
             message: `Route ${c.req.method} ${c.req.path} not found.`,
         },
         404,
@@ -40,9 +44,9 @@ app.notFound((c) => {
 });
 app.onError((err, c) => {
     if (err instanceof HTTPException) {
-        return c.json({error: err.message}, err.status);
+        return c.json({success: false, message: err.message}, err.status);
     }
-    return c.json({error: "Internal Server Error"}, 500);
+    return c.json({success: false, message: "Internal Server Error"}, 500);
 });
 openapi(app)
 

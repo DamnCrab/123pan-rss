@@ -1,9 +1,21 @@
 import {createMiddleware} from 'hono/factory'
 import {getCookie} from 'hono/cookie'
 import {sign, verify} from 'hono/jwt'
+import {createErrorResponse, ErrorType} from '../utils/errorHandler'
 
-export const JWT_SECRET = 'your-secret-key'
 export const expirationTime = 60 * 60 * 24 // 24小时
+
+// 获取JWT密钥的函数
+const getJwtSecret = (env: any) => {
+    const secret = env.JWT_SECRET;
+    if (!secret) {
+        throw new Error('JWT_SECRET environment variable is required');
+    }
+    if (secret.length < 32) {
+        throw new Error('JWT_SECRET must be at least 32 characters long');
+    }
+    return secret;
+}
 
 // JWT验证中间件
 export const jwtMiddleware = createMiddleware(async (c, next) => {
@@ -11,26 +23,33 @@ export const jwtMiddleware = createMiddleware(async (c, next) => {
     let token = getCookie(c, 'auth_token');
 
     if (!token) {
-        return c.json({error: '未提供有效的认证token'}, 401)
+        return c.json({
+            success: false,
+            message: '未提供有效的认证token'
+        }, 401)
     }
 
     try {
-        const payload = await verify(token, JWT_SECRET)
+        const jwtSecret = getJwtSecret(c.env)
+        const payload = await verify(token, jwtSecret)
         // 将用户信息存储到context中，供后续使用
         c.set('jwtPayload', payload)
         await next()
     } catch (error) {
-        return c.json({error: 'token无效或已过期'}, 401)
+        // 使用统一的错误处理
+        const errorResponse = createErrorResponse(error, 'token无效或已过期');
+        return c.json(errorResponse, 401)
     }
 })
 
-export const signUserJwt = async (user: { id: any; username: any }) => {
+export const signUserJwt = async (user: { id: any; username: any }, env: any) => {
     const payload = {
         id: user.id,
         username: user.username,
         exp: Math.floor(Date.now() / 1000) + expirationTime // 24小时过期
     }
-    return await sign(payload, JWT_SECRET)
+    const jwtSecret = getJwtSecret(env)
+    return await sign(payload, jwtSecret)
 }
 
 // 密码哈希函数

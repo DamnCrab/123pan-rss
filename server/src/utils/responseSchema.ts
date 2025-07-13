@@ -1,21 +1,18 @@
 import {z} from "zod";
 import {resolver} from "hono-openapi/zod";
 
-export const errorResponseSchema = z.object({
-    success: z.boolean().describe('success'),
-    message: z.string().describe('message'),
-    error: z.string().optional()
+// 统一的API响应格式
+export const apiResponseSchema = z.object({
+    success: z.boolean().describe('操作是否成功'),
+    message: z.string().describe('响应消息'),
+    data: z.any().optional().describe('响应数据')
 }).openapi({
-    ref: 'ErrorResponse'
+    ref: 'ApiResponse'
 })
 
-export const successResponseSchema = z.object({
-    success: z.boolean().describe('success'),
-    message: z.string().describe('message'),
-    data: z.any().optional()
-}).openapi({
-    ref: 'SuccessResponse'
-})
+// 兼容旧版本的导出
+export const successResponseSchema = apiResponseSchema
+export const errorResponseSchema = apiResponseSchema
 
 export const responseSchema = (successSchema?: any) => {
     return {
@@ -27,15 +24,15 @@ export const responseSchema = (successSchema?: any) => {
                         success: z.boolean(),
                         message: z.string(),
                         data: successSchema
-                    }) : successResponseSchema)
+                    }) : apiResponseSchema)
                 }
             }
         },
-        401: {
-            description: '未授权访问',
+        404: {
+            description: '资源未找到',
             content: {
                 'application/json': {
-                    schema: resolver(errorResponseSchema)
+                    schema: resolver(apiResponseSchema)
                 }
             }
         },
@@ -43,7 +40,7 @@ export const responseSchema = (successSchema?: any) => {
             description: '服务器内部错误',
             content: {
                 'application/json': {
-                    schema: resolver(errorResponseSchema)
+                    schema: resolver(apiResponseSchema)
                 }
             }
         }

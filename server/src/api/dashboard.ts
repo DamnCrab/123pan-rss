@@ -7,6 +7,7 @@ import {eq, count, and} from 'drizzle-orm'
 import {rssSubscriptionsTable, magnetLinksTable} from '../db/schema'
 import {responseSchema} from '../utils/responseSchema'
 import {jwtMiddleware} from '../middleware/jwt'
+import {handleError, createErrorResponse, ErrorType} from '../utils/errorHandler'
 
 const app = new Hono()
 
@@ -114,11 +115,7 @@ app.get('/stats',
                 data: stats
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '获取Dashboard统计数据失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '获取Dashboard统计数据失败');
         }
     })
 

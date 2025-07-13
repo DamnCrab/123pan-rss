@@ -1,5 +1,4 @@
 import {Hono} from 'hono'
-import {sign} from 'hono/jwt'
 import {z} from 'zod'
 import "zod-openapi/extend";
 import {describeRoute} from "hono-openapi";
@@ -7,9 +6,11 @@ import {validator as zValidator} from "hono-openapi/zod";
 import {db} from "../db";
 import {eq} from 'drizzle-orm';
 import {setCookie} from 'hono/cookie';
-import {hashPassword, JWT_SECRET, jwtMiddleware, signUserJwt, verifyPassword} from '../middleware/jwt';
+import {hashPassword, jwtMiddleware, signUserJwt, verifyPassword} from '../middleware/jwt';
 import {usersTable} from "../db/schema";
-import {responseSchema, successResponseSchema} from "../utils/responseSchema";
+import {responseSchema} from "../utils/responseSchema";
+import {handleError, createErrorResponse} from '../utils/errorHandler';
+import {loginRateLimit} from '../middleware/rateLimiter';
 
 const app = new Hono()
 
@@ -77,6 +78,7 @@ const changePasswordSchema = z.object({
 
 // 登录接口
 app.post('/login',
+    loginRateLimit, // 应用登录速率限制
     describeRoute({
         tags: ['用户'],
         summary: '用户登录',
@@ -101,10 +103,10 @@ app.post('/login',
                 return c.json({
                     success: false,
                     message: '用户名或密码错误'
-                }, 401)
+                }, 200)
             }
 
-            const token = await signUserJwt(user);
+            const token = await signUserJwt(user, env);
 
             // 将JWT存储到cookie中
             setCookie(c, 'auth_token', token, {
@@ -126,12 +128,8 @@ app.post('/login',
                 }
             })
         } catch (error) {
-            console.error('登录错误:', error);
-            return c.json({
-                success: false,
-                message: '服务器内部错误',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            console.log(error)
+            return handleError(error, c, '登录错误');
         }
     })
 
@@ -202,12 +200,7 @@ app.get('/profile',
                 data: currentUser[0]
             });
         } catch (error) {
-            console.error('获取用户信息错误:', error);
-            return c.json({
-                success: false,
-                message: '服务器内部错误',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '获取用户信息错误');
         }
     })
 
@@ -246,7 +239,7 @@ app.put('/admin/profile',
                 return c.json({
                     success: false,
                     message: '当前密码错误'
-                }, 401);
+                }, 200);
             }
 
             // 检查新用户名是否已存在（如果用户名有变化）
@@ -258,7 +251,7 @@ app.put('/admin/profile',
                     return c.json({
                         success: false,
                         message: '用户名已存在'
-                    }, 400);
+                    }, 200);
                 }
             }
 
@@ -281,12 +274,7 @@ app.put('/admin/profile',
                 }
             });
         } catch (error) {
-            console.error('修改管理员信息错误:', error);
-            return c.json({
-                success: false,
-                message: '服务器内部错误',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '修改管理员信息错误');
         }
     })
 
@@ -325,7 +313,7 @@ app.put('/password',
                 return c.json({
                     success: false,
                     message: '当前密码错误'
-                }, 401);
+                }, 200);
             }
 
             // 对新密码进行哈希处理
@@ -343,12 +331,7 @@ app.put('/password',
                 message: '密码修改成功'
             });
         } catch (error) {
-            console.error('修改密码错误:', error);
-            return c.json({
-                success: false,
-                message: '服务器内部错误',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '修改密码错误');
         }
     })
 

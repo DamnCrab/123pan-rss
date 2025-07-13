@@ -5,16 +5,26 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { db } from "../db";
 import { eq, inArray, and } from 'drizzle-orm';
-import { cloudTokenTable, magnetLinksTable, rssSubscriptionsTable } from "../db/schema";
+import {  magnetLinksTable, rssSubscriptionsTable } from "../db/schema";
 import { responseSchema } from "../utils/responseSchema";
 import { jwtMiddleware } from '../middleware/jwt';
-import {createOfflineDownload, getAccessToken, getFileList} from "../utils/cloud123";
+import { getAccessToken, getFileList} from "../utils/cloud123";
 import {retryMagnetDownload} from "../utils/rss";
+import {handleError} from '../utils/errorHandler';
+import {strictRateLimit} from '../middleware/rateLimiter';
 
 const app = new Hono();
 
-// 应用JWT中间件到所有123云盘路由
-app.use('/*', jwtMiddleware);
+// 应用JWT中间件到所有123云盘路由，但排除回调接口
+app.use('/*', async (c, next) => {
+    // 回调接口不需要JWT验证，因为是外部系统调用
+    if (c.req.path.endsWith('/offline/callback')) {
+        await next();
+        return;
+    }
+    // 其他接口需要JWT验证
+    return jwtMiddleware(c, next);
+});
 
 // 文件列表查询参数schema
 const fileListQuerySchema = z.object({
@@ -85,17 +95,6 @@ const fileListResponseSchema = z.object({
     }
 });
 
-// 配置响应schema
-const configResponseSchema = z.object({
-    accessToken: z.string().describe('access_token前缀（已脱敏）'),
-    configured: z.boolean().describe('是否已配置')
-}).openapi({
-    ref: 'Cloud123ConfigResponse',
-    example: {
-        accessToken: 'eyJhbGciOi...',
-        configured: true
-    }
-});
 
 // 配置123云盘客户端信息
 app.post('/config',
@@ -104,7 +103,7 @@ app.post('/config',
         summary: '配置123云盘客户端信息',
         description: '配置clientId和clientSecret，并获取access_token',
         security: [{bearerAuth: []}],
-        responses: responseSchema(configResponseSchema)
+        responses: responseSchema()
     }),
     async (c) => {
         try {
@@ -115,26 +114,17 @@ app.post('/config',
             if (!accessToken) {
                 return c.json({
                     success: false,
-                    message: '配置失败，无法获取access_token',
-                    error: '请检查clientId和clientSecret是否正确'
-                }, 400);
+                    message: '配置失败，无法获取access_token'
+                }, 200);
             }
 
             return c.json({
                 success: true,
                 message: '123云盘配置成功',
-                data: {
-                    // accessToken: accessToken.substring(0, 10) + '...', // 只显示前10位
-                    accessToken : accessToken,
-                    configured: true
-                }
+                data: true
             });
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '配置123云盘失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '配置123云盘失败');
         }
     }
 );
@@ -165,84 +155,10 @@ app.get('/files',
                 data: fileList
             });
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '获取文件列表失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '获取文件列表失败');
         }
     }
 );
-
-
-// const statusResponseSchema = z.object({
-//     configured: z.boolean().describe('是否已配置'),
-//     hasValidToken: z.boolean().describe('是否已获取有效的access_token'),
-//     tokenExpiredAt: z.number().nullable().describe('access_token过期时间戳，null表示未获取token'),
-//     clientId: z.string().nullable().describe('已配置的clientId前缀，null表示未配置')
-// }).openapi({
-//     ref: 'Cloud123StatusResponse',
-//     example: {
-//         configured: true,
-//         hasValidToken: true,
-//         tokenExpiredAt: 1704067200000,
-//         clientId: '123456...'
-//     }
-// });
-
-// // 获取当前配置状态
-// app.get('/status',
-//     describeRoute({
-//         tags: ['123云盘'],
-//         summary: '获取配置状态',
-//         description: '获取当前123云盘配置和token状态',
-//         security: [{bearerAuth: []}],
-//         responses: responseSchema(statusResponseSchema)
-//     }),
-//     async (c) => {
-//         try {
-//             const env = c.env as Cloudflare.Env;
-//             const database = db(env);
-//
-//             const config = await database.select().from(cloudTokenTable).limit(1);
-//
-//             if (config.length === 0) {
-//                 return c.json({
-//                     success: true,
-//                     message: '123云盘未配置',
-//                     data: {
-//                         configured: false,
-//                         hasValidToken: false,
-//                         tokenExpiredAt: null,
-//                         clientId: null
-//                     }
-//                 });
-//             }
-//
-//             const tokenConfig = config[0];
-//             const now = Date.now();
-//             const isTokenValid = tokenConfig.accessToken && tokenConfig.expiredAt && tokenConfig.expiredAt > now;
-//
-//             return c.json({
-//                 success: true,
-//                 message: `123云盘已配置，token${isTokenValid ? '有效' : '已过期或无效'}`,
-//                 data: {
-//                     configured: true,
-//                     hasValidToken: isTokenValid,
-//                     tokenExpiredAt: tokenConfig.expiredAt,
-//                     clientId: tokenConfig.clientId ? tokenConfig.clientId.substring(0, 6) + '...' : null
-//                 }
-//             });
-//         } catch (error) {
-//             return c.json({
-//                 success: false,
-//                 message: '获取123云盘状态失败',
-//                 error: error instanceof Error ? error.message : '未知错误'
-//             }, 500);
-//         }
-//     }
-// );
-
 
 // 批量重试请求schema
 const retryRequestSchema = z.object({
@@ -301,6 +217,7 @@ const retryResponseSchema = z.object({
 
 // 批量重试下载失败的任务
 app.post('/offline/retry',
+    strictRateLimit, // 应用严格速率限制
     describeRoute({
         tags: ['123云盘'],
         summary: '批量重试下载失败的任务',
@@ -412,7 +329,7 @@ app.post('/offline/retry',
                         id: task.id,
                         title: task.title,
                         success: false,
-                        error: error instanceof Error ? error.message : '未知错误'
+                        error: '重试失败'
                     });
 
                     console.error(`重试任务 ${task.id} 失败:`, error);
@@ -425,12 +342,7 @@ app.post('/offline/retry',
                 data: results
             });
         } catch (error) {
-            console.error('批量重试下载失败:', error);
-            return c.json({
-                success: false,
-                message: '批量重试失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '批量重试下载失败');
         }
     }
 );
@@ -514,12 +426,7 @@ app.post('/offline/callback',
 
             return c.json({ success: true, message: '回调处理成功' });
         } catch (error) {
-            console.error('处理离线下载回调失败:', error);
-            return c.json({
-                success: false,
-                message: '回调处理失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500);
+            return handleError(error, c, '处理离线下载回调失败');
         }
     }
 );

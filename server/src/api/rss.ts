@@ -12,6 +12,8 @@ import {responseSchema} from "../utils/responseSchema";
 import {createFolder} from "../utils/cloud123";
 import {updateSingleRSS} from "../utils/rss";
 import {magnetLinksTable} from "../db/schema";
+import {handleError} from '../utils/errorHandler';
+import {rssUpdateRateLimit} from '../middleware/rateLimiter';
 
 const app = new Hono()
 
@@ -144,11 +146,7 @@ app.post('/',
                 data: newSubscription
             }, 200)
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '添加RSS订阅失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '添加RSS订阅失败');
         }
     })
 
@@ -189,11 +187,7 @@ app.get('/',
                 data: subscriptions
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '获取RSS订阅列表失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '获取RSS订阅列表失败');
         }
     })
 
@@ -235,11 +229,7 @@ app.get('/detail',
                 data: subscription
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '获取RSS订阅失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '获取RSS订阅失败');
         }
     })
 
@@ -305,11 +295,7 @@ app.put('/update',
                 data: updatedSubscription
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '更新RSS订阅失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '更新RSS订阅失败');
         }
     })
 
@@ -367,11 +353,7 @@ app.delete('/remove',
                 message: 'RSS订阅删除成功'
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '删除RSS订阅失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '删除RSS订阅失败');
         }
     })
 
@@ -432,16 +414,13 @@ app.patch('/toggle',
                 data: updatedSubscription
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '切换RSS订阅状态失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '切换RSS订阅状态失败');
         }
     })
 
 // 手动更新单个RSS订阅
 app.post('/update-feed',
+    rssUpdateRateLimit, // 应用RSS更新速率限制
     describeRoute({
         tags: ['RSS订阅'],
         summary: '手动更新单个RSS订阅',
@@ -508,11 +487,7 @@ app.post('/update-feed',
                 }, 500)
             }
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '更新RSS订阅失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '更新RSS订阅失败');
         }
     })
 

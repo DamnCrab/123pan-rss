@@ -9,8 +9,14 @@ import {magnetLinksTable} from '../db/schema'
 import {responseSchema} from '../utils/responseSchema'
 import {updateAllRSS, updateSingleRSS, createMagnetDownload} from "../utils/rss";
 import {getOfflineDownloadProgress} from "../utils/cloud123";
+import {jwtMiddleware} from '../middleware/jwt';
+import {handleError, createErrorResponse, ErrorType} from '../utils/errorHandler';
+import {rssUpdateRateLimit} from '../middleware/rateLimiter';
 
 const app = new Hono()
+
+// 为所有路由添加JWT验证中间件
+app.use('/*', jwtMiddleware)
 
 // 磁力链接响应schema
 const magnetLinkSchema = z.object({
@@ -83,6 +89,7 @@ const triggerQuerySchema = z.object({
 
 // 手动触发RSS更新的API端点
 app.post('/trigger',
+    rssUpdateRateLimit, // 应用RSS更新速率限制
     describeRoute({
         tags: ['磁力链接管理'],
         summary: '手动触发RSS更新',
@@ -112,7 +119,7 @@ app.post('/trigger',
                     return c.json({
                         success: false,
                         message: 'RSS订阅ID必须是有效的数字'
-                    }, 400)
+                    }, 200)
                 }
                 
                 const result = await updateSingleRSS(c.env, subscriptionId, true) // 强制更新
@@ -145,11 +152,7 @@ app.post('/trigger',
                 })
             }
         } catch (error) {
-            return c.json({
-                success: false,
-                message: 'RSS更新任务失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, 'RSS更新任务失败');
         }
     })
 
@@ -205,14 +208,14 @@ app.get('/list',
                 return c.json({
                     success: false,
                     message: 'pageSize参数必须在1-100之间'
-                }, 400)
+                }, 200)
             }
 
             if (pageNum < 1) {
                 return c.json({
                     success: false,
                     message: 'pageNum参数必须大于0'
-                }, 400)
+                }, 200)
             }
 
             // 计算limit和offset
@@ -230,7 +233,7 @@ app.get('/list',
                     return c.json({
                         success: false,
                         message: 'rssId参数必须是有效的数字'
-                    }, 400)
+                    }, 200)
                 }
                 whereConditions.push(eq(magnetLinksTable.rssSubscriptionId, rssIdNum));
             }
@@ -335,11 +338,7 @@ app.get('/list',
                 data: updatedMagnetLinks
             })
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '获取磁力链接列表失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '获取磁力链接列表失败');
         }
     })
 
@@ -380,7 +379,7 @@ app.post('/download/:id',
                 return c.json({
                     success: false,
                     message: '磁力链接ID必须是有效的数字'
-                }, 400)
+                }, 200)
             }
 
             const database = db(c.env)
@@ -404,7 +403,7 @@ app.post('/download/:id',
                 return c.json({
                     success: false,
                     message: `磁力链接已经${magnetLink.downloadStatus === 'downloading' ? '正在下载' : '下载完成'}，无需重复创建任务`
-                }, 400)
+                }, 200)
             }
 
             // 调用创建下载任务的方法
@@ -425,11 +424,7 @@ app.post('/download/:id',
                 }, 500)
             }
         } catch (error) {
-            return c.json({
-                success: false,
-                message: '创建下载任务失败',
-                error: error instanceof Error ? error.message : '未知错误'
-            }, 500)
+            return handleError(error, c, '创建下载任务失败');
         }
     })
 
