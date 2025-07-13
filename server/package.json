@@ -4,7 +4,7 @@
     "dev-server": "wrangler dev",
     "dev-server:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy --minify",
-    "build-frontend": "cd ../client && bun install && bun run build",
+    "build-frontend": "cd ../client && bun install && bun run build-only",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "deploy-with-frontend": "npm run build-frontend && wrangler deploy --minify",
     "drizzle:generate": "drizzle-kit generate",
