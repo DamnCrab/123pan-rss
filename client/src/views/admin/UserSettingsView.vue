@@ -111,6 +111,38 @@
         </n-card>
       </n-grid-item>
 
+      <!-- 123云盘设置 -->
+      <n-grid-item>
+        <n-card title="123云盘设置">
+          <n-space vertical>
+            <div>
+              <n-text>密钥管理</n-text>
+              <n-text depth="3" class="block text-sm mt-1">
+                点击按钮刷新123云盘API密钥
+              </n-text>
+            </div>
+            
+            <div class="flex items-center gap-3">
+              <n-icon size="20" class="text-blue-500">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,7.9 15.4,9.4C16,11 15.4,12.6 14,13.2C12.6,13.8 11,13.2 10.4,11.8C9.8,10.2 10.4,8.6 11.8,8C11.9,7.9 12,7.9 12,7Z" />
+                </svg>
+              </n-icon>
+              <div class="flex-1">
+                <div class="text-sm font-medium">API密钥状态</div>
+                <div class="text-xs text-gray-500">自动管理密钥更新</div>
+              </div>
+            </div>
+          </n-space>
+
+          <template #action>
+            <n-button type="primary" @click="refreshCloudKeys" :loading="refreshingKeys">
+              刷新密钥
+            </n-button>
+          </template>
+        </n-card>
+      </n-grid-item>
+
       <!-- 数据管理 -->
       <n-grid-item>
         <n-card title="数据管理">
@@ -196,6 +228,7 @@ const systemFormRef = ref<FormInst | null>(null)
 // 加载状态
 const updatingProfile = ref(false)
 const updatingSystem = ref(false)
+const refreshingKeys = ref(false)
 const cleaningLogs = ref(false)
 const exporting = ref(false)
 
@@ -255,6 +288,8 @@ const fetchSystemSettings = async () => {
     console.error('获取系统设置失败:', error)
   }
 }
+
+
 
 const updateProfile = async () => {
   if (!profileFormRef.value) return
@@ -397,6 +432,30 @@ const handleImportConfig = async (options: { file: UploadFileInfo }) => {
     }
   } catch (error) {
     message.error('网络错误，请稍后重试')
+  }
+}
+
+const refreshCloudKeys = async () => {
+  try {
+    refreshingKeys.value = true
+
+    const response = await fetch('/api/cloud/refresh-keys', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    const result = await response.json()
+    if (result.success) {
+      message.success('123云盘密钥刷新成功')
+    } else {
+      message.error(result.message || '刷新失败')
+    }
+  } catch (error) {
+    message.error('网络错误，请稍后重试')
+  } finally {
+    refreshingKeys.value = false
   }
 }
 

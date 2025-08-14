@@ -81,6 +81,14 @@ const showPasswordModal = ref(false)
 
 // 根据当前路由计算活跃菜单
 const activeMenu = computed(() => {
+  const routeName = route.name as string
+  // 直接使用路由名称，如果没有匹配的则使用路径匹配
+  if (routeName === 'dashboard') return 'dashboard'
+  if (routeName === 'rss') return 'rss'
+  if (routeName === 'cloud') return 'cloud'
+  if (routeName === 'settings') return 'settings'
+  
+  // 兜底：使用路径匹配
   const path = route.path
   if (path.includes('/admin/dashboard')) return 'dashboard'
   if (path.includes('/admin/rss')) return 'rss'

@@ -38,6 +38,11 @@ const router = createRouter({
           component: () => import('@/views/admin/RssManagementView.vue')
         },
         {
+          path: 'cloud',
+          name: 'cloud',
+          component: () => import('@/views/admin/CloudManagementView.vue')
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/admin/UserSettingsView.vue')
