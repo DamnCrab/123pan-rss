@@ -10,7 +10,7 @@ interface pan123Response {
 }
 
 // 获取access_token
-export async function getAccessToken(env: Cloudflare.Env): Promise<string | null> {
+export async function getAccessToken(env: Cloudflare.Env, force: boolean = false): Promise<string | null> {
     const database = db(env);
 
     try {
@@ -38,12 +38,12 @@ export async function getAccessToken(env: Cloudflare.Env): Promise<string | null
 
         const tokenConfig = config[0];
 
-        // 检查token是否存在且在85天刷新周期内
+        // 检查token是否存在且在85天刷新周期内（除非强制刷新）
         const now = Date.now();
         const dayMs = 24 * 60 * 60 * 1000; // 一天的毫秒数
         const refreshThreshold = 85 * dayMs; // 85天的毫秒数
 
-        if (tokenConfig.accessToken && tokenConfig.createdAt) {
+        if (!force && tokenConfig.accessToken && tokenConfig.createdAt) {
             const tokenAge = now - tokenConfig.createdAt;
             // 如果token使用时间少于85天，直接返回现有token
             if (tokenAge < refreshThreshold) {
@@ -53,7 +53,7 @@ export async function getAccessToken(env: Cloudflare.Env): Promise<string | null
                 return tokenConfig.accessToken;
             }
             console.log(`Token已使用${Math.floor(tokenAge / dayMs)}天，需要刷新`);
-        } else if (tokenConfig.accessToken && tokenConfig.expiredAt) {
+        } else if (!force && tokenConfig.accessToken && tokenConfig.expiredAt) {
             // 兼容旧逻辑：如果没有createdAt但有expiredAt，使用原来的1小时提前刷新逻辑
             const oneHourMs = 60 * 60 * 1000;
             if ((tokenConfig.expiredAt - now) > oneHourMs) {
@@ -61,6 +61,8 @@ export async function getAccessToken(env: Cloudflare.Env): Promise<string | null
                 return tokenConfig.accessToken;
             }
             console.log('Token即将过期，需要刷新');
+        } else if (force) {
+            console.log('强制刷新token，跳过有效性检查');
         }
 
         // 请求新的access_token

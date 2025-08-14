@@ -274,8 +274,27 @@ app.post('/token/refresh',
     describeRoute({
         tags: ['123云盘'],
         summary: '检查和刷新token状态',
-        description: '手动检查token状态并根据85天刷新策略进行刷新',
+        description: '手动检查token状态并根据85天刷新策略进行刷新，支持强制刷新',
         security: [{bearerAuth: []}],
+        requestBody: {
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            force: {
+                                type: 'boolean',
+                                description: '是否强制刷新token，默认为false',
+                                default: false
+                            }
+                        }
+                    },
+                    example: {
+                        force: true
+                    }
+                }
+            }
+        },
         responses: responseSchema(z.object({
             tokenAge: z.number().describe('token使用天数'),
             refreshThreshold: z.number().describe('刷新阈值（天）'),
@@ -293,8 +312,12 @@ app.post('/token/refresh',
             }
         }))
     }),
+    zValidator('json', z.object({
+        force: z.boolean().optional().describe('是否强制刷新token，默认为false')
+    })),
     async (c) => {
         try {
+            const { force = false } = c.req.valid('json');
             const env = c.env as Cloudflare.Env;
             const database = db(env);
 
@@ -335,8 +358,15 @@ app.post('/token/refresh',
                 }
             }
 
-            // 执行刷新检查
-            await refreshTokenIfNeeded(env);
+            // 执行刷新检查或强制刷新
+            if (force) {
+                // 强制刷新：直接调用getAccessToken获取新token
+                console.log('执行强制刷新token...');
+                await getAccessToken(env, true);
+            } else {
+                // 按策略刷新：只有在需要时才刷新
+                await refreshTokenIfNeeded(env);
+            }
             
             // 检查是否已刷新（通过比较updatedAt时间）
             const updatedConfig = await database.select().from(cloudTokenTable).limit(1);
