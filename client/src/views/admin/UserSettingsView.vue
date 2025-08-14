@@ -118,7 +118,7 @@
             <div>
               <n-text>密钥管理</n-text>
               <n-text depth="3" class="block text-sm mt-1">
-                点击按钮刷新123云盘API密钥
+                点击按钮强制刷新123云盘API密钥
               </n-text>
             </div>
             
@@ -152,7 +152,7 @@
               </n-icon>
               <div class="flex-1">
                 <div class="text-sm font-medium">API密钥状态</div>
-                <div class="text-xs text-gray-500">自动管理密钥更新</div>
+                <div class="text-xs text-gray-500">强制管理密钥更新</div>
               </div>
             </div>
           </n-space>
@@ -160,7 +160,7 @@
           <template #action>
             <n-space>
               <n-button type="primary" @click="refreshCloudKeys" :loading="refreshingKeys">
-                刷新密钥
+                强制刷新密钥
               </n-button>
               <n-button type="default" @click="fetchCloudStatus" :loading="loadingCloudStatus">
                 查看状态
@@ -480,17 +480,21 @@ const refreshCloudKeys = async () => {
 
     const response = await fetch('/api/cloud123/token/refresh', {
       method: 'POST',
-      credentials: 'include'
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ force: true })
     })
 
     const result = await response.json()
     if (result.success) {
-      message.success('123云盘密钥刷新成功')
+      message.success('123云盘密钥强制刷新成功')
       lastRefreshTime.value = new Date().toISOString()
       // 刷新后重新获取状态
       await fetchCloudStatus()
     } else {
-      message.error(result.message || '刷新失败')
+      message.error(result.message || '强制刷新失败')
     }
   } catch (error) {
     message.error('网络错误，请稍后重试')
