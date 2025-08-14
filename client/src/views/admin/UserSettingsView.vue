@@ -122,6 +122,28 @@
               </n-text>
             </div>
             
+            <!-- 密钥状态信息 -->
+            <div v-if="cloudStatus" class="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">密钥状态:</span>
+                <n-tag :type="cloudStatus.hasValidToken ? 'success' : 'error'">
+                  {{ cloudStatus.hasValidToken ? '有效' : '已过期' }}
+                </n-tag>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">已使用天数:</span>
+                <span class="text-sm">{{ cloudStatus.tokenAge || 0 }} 天</span>
+              </div>
+              <div v-if="cloudStatus.nextRefreshDate" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">下次刷新时间:</span>
+                <span class="text-sm">{{ formatDate(cloudStatus.nextRefreshDate) }}</span>
+              </div>
+              <div v-if="lastRefreshTime" class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">上次刷新时间:</span>
+                <span class="text-sm">{{ formatDate(lastRefreshTime) }}</span>
+              </div>
+            </div>
+            
             <div class="flex items-center gap-3">
               <n-icon size="20" class="text-blue-500">
                 <svg viewBox="0 0 24 24" fill="currentColor">
@@ -136,9 +158,14 @@
           </n-space>
 
           <template #action>
-            <n-button type="primary" @click="refreshCloudKeys" :loading="refreshingKeys">
-              刷新密钥
-            </n-button>
+            <n-space>
+              <n-button type="primary" @click="refreshCloudKeys" :loading="refreshingKeys">
+                刷新密钥
+              </n-button>
+              <n-button type="default" @click="fetchCloudStatus" :loading="loadingCloudStatus">
+                查看状态
+              </n-button>
+            </n-space>
           </template>
         </n-card>
       </n-grid-item>
@@ -214,9 +241,12 @@ import {
   NDivider,
   NUpload,
   NH1,
+  NIcon,
+  NTag,
   useMessage
 } from 'naive-ui'
 import type { FormInst, FormRules, UploadFileInfo } from 'naive-ui'
+import { CloudOutline, RefreshOutline, InformationCircleOutline } from '@vicons/ionicons5'
 import PasswordChangeModal from '@/components/PasswordChangeModal.vue'
 
 const message = useMessage()
@@ -231,6 +261,21 @@ const updatingSystem = ref(false)
 const refreshingKeys = ref(false)
 const cleaningLogs = ref(false)
 const exporting = ref(false)
+const loadingCloudStatus = ref(false)
+
+// 云盘状态
+interface CloudStatus {
+  configured: boolean
+  hasValidToken: boolean
+  tokenExpiredAt: number | null
+  clientId: string | null
+  tokenAge: number
+  refreshThreshold: number
+  nextRefreshDate: number | null
+}
+
+const cloudStatus = ref<CloudStatus | null>(null)
+const lastRefreshTime = ref<string | null>(null)
 
 // 弹窗状态
 const showPasswordModal = ref(false)
@@ -439,7 +484,7 @@ const refreshCloudKeys = async () => {
   try {
     refreshingKeys.value = true
 
-    const response = await fetch('/api/cloud/refresh-keys', {
+    const response = await fetch('/api/cloud123/token/refresh', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -449,6 +494,9 @@ const refreshCloudKeys = async () => {
     const result = await response.json()
     if (result.success) {
       message.success('123云盘密钥刷新成功')
+      lastRefreshTime.value = new Date().toISOString()
+      // 刷新后重新获取状态
+      await fetchCloudStatus()
     } else {
       message.error(result.message || '刷新失败')
     }
@@ -459,8 +507,37 @@ const refreshCloudKeys = async () => {
   }
 }
 
+const fetchCloudStatus = async () => {
+  try {
+    loadingCloudStatus.value = true
+
+    const response = await fetch('/api/cloud123/status', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+
+    const result = await response.json()
+    if (result.success) {
+      cloudStatus.value = result.data
+    } else {
+      message.error(result.message || '获取状态失败')
+    }
+  } catch (error) {
+    console.error('获取云盘状态失败:', error)
+  } finally {
+    loadingCloudStatus.value = false
+  }
+}
+
+const formatDate = (dateString: string | number | null): string => {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleString('zh-CN')
+}
+
 onMounted(() => {
   fetchUserProfile()
   fetchSystemSettings()
+  fetchCloudStatus()
 })
 </script>
