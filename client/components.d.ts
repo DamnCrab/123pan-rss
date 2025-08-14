@@ -10,6 +10,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     ErrorBoundary: typeof import('./src/components/ErrorBoundary.vue')['default']
     MagnetLinksModal: typeof import('./src/components/MagnetLinksModal.vue')['default']
+    NAvatar: typeof import('naive-ui')['NAvatar']
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']
     NCascader: typeof import('naive-ui')['NCascader']

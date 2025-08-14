@@ -2,170 +2,146 @@
   <div>
     <n-h1 class="mb-6">云盘管理</n-h1>
 
-    <!-- 云盘账户信息 -->
-    <n-card title="云盘账户" class="mb-6">
+    <!-- 云盘用户信息 -->
+    <n-card title="用户信息" class="mb-6">
       <n-space vertical>
-        <div class="flex justify-between items-center">
-          <span>账户状态:</span>
-          <n-tag :type="accountStatus === 'connected' ? 'success' : 'error'">
-            {{ accountStatus === 'connected' ? '已连接' : '未连接' }}
-          </n-tag>
-        </div>
-        
         <!-- 用户信息展示 -->
         <template v-if="userInfo">
-          <n-divider>用户信息</n-divider>
-          <div class="flex justify-between items-center">
-            <span>用户昵称:</span>
-            <span>{{ userInfo.nickname }}</span>
+          
+          <!-- 基本信息 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="flex items-center space-x-3">
+              <n-avatar 
+                :size="40" 
+                :src="userInfo.avatar" 
+                :fallback-src="'/favicon.ico'"
+                round
+              />
+              <div>
+                <div class="font-medium">{{ userInfo.nickname }}</div>
+                <div class="text-sm text-gray-500">UID: {{ userInfo.isHideUID ? '****' : userInfo.uid }}</div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">手机号:</span>
+                <span class="text-sm">{{ userInfo.passport }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">邮箱:</span>
+                <span class="text-sm">{{ userInfo.mail }}</span>
+              </div>
+            </div>
           </div>
-          <div class="flex justify-between items-center">
-            <span>手机号:</span>
-            <span>{{ userInfo.passport }}</span>
+
+          <!-- VIP信息 -->
+          <div class="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium text-gray-700">会员状态</span>
+              <n-tag :type="userInfo.vipInfo.isVip ? 'warning' : 'default'" size="small">
+                {{ userInfo.vipInfo.isVip ? 'VIP用户' : '普通用户' }}
+              </n-tag>
+            </div>
+            <div v-if="userInfo.vipInfo.isVip && userInfo.vipInfo.vipExpiredAt" class="space-y-1">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-600">到期时间:</span>
+                <span>{{ formatDate(userInfo.vipInfo.vipExpiredAt) }}</span>
+              </div>
+            </div>
           </div>
-          <div class="flex justify-between items-center">
-            <span>邮箱:</span>
-            <span>{{ userInfo.mail }}</span>
+
+          <!-- 开发者信息 -->
+          <div v-if="userInfo.developerInfo.isDeveloper" class="bg-blue-50 p-4 rounded-lg mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium text-gray-700">开发者权益</span>
+              <n-tag type="info" size="small">开发者</n-tag>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-gray-600">权益到期:</span>
+              <span>{{ formatDate(userInfo.developerInfo.developerExpiredAt) }}</span>
+            </div>
           </div>
-          <div class="flex justify-between items-center">
-            <span>VIP状态:</span>
-            <n-tag :type="userInfo.vipInfo.isVip ? 'success' : 'default'">
-              {{ userInfo.vipInfo.isVip ? 'VIP用户' : '普通用户' }}
-            </n-tag>
-          </div>
-          <div v-if="userInfo.vipInfo.isVip" class="flex justify-between items-center">
-            <span>VIP到期时间:</span>
-            <span>{{ formatDate(userInfo.vipInfo.vipExpiredAt) }}</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span>开发者状态:</span>
-            <n-tag :type="userInfo.developerInfo.isDeveloper ? 'info' : 'default'">
-              {{ userInfo.developerInfo.isDeveloper ? '开发者' : '普通用户' }}
-            </n-tag>
+
+          <!-- 其他信息 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-600">剩余直链流量:</span>
+              <span class="text-sm">{{ formatSize(userInfo.directTraffic) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-gray-600">HTTPS数量:</span>
+              <span class="text-sm">{{ userInfo.httpsCount }}</span>
+            </div>
           </div>
         </template>
         
         <n-divider>存储信息</n-divider>
-        <div class="flex justify-between items-center">
-          <span>存储空间:</span>
-          <span v-if="userInfo">
-            {{ formatSize(userInfo.spaceInfo.usedSize) }} / {{ formatSize(userInfo.spaceInfo.totalSize) }}
-          </span>
-          <span v-else>{{ storageInfo.used }} / {{ storageInfo.total }}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span>上次同步:</span>
-          <span>{{ lastSync || '从未同步' }}</span>
-        </div>
+        <template v-if="userInfo">
+          <!-- 永久空间 -->
+          <div class="bg-green-50 p-4 rounded-lg mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium text-gray-700">永久存储空间</span>
+              <span class="text-sm text-gray-600">{{ getStorageUsagePercent(userInfo.spaceInfo.usedSize, userInfo.spaceInfo.totalSize - userInfo.spaceInfo.tempSize) }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div 
+                class="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                :style="{ width: getStorageUsagePercent(userInfo.spaceInfo.usedSize, userInfo.spaceInfo.totalSize - userInfo.spaceInfo.tempSize) + '%' }"
+              ></div>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-gray-600">已使用:</span>
+              <span>{{ formatSize(userInfo.spaceInfo.usedSize) }} / {{ formatSize(userInfo.spaceInfo.totalSize - userInfo.spaceInfo.tempSize) }}</span>
+            </div>
+          </div>
+
+          <!-- 临时空间 -->
+          <div v-if="userInfo.spaceInfo.tempSize > 0" class="bg-blue-50 p-4 rounded-lg mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium text-gray-700">临时存储空间</span>
+              <n-tag type="info" size="small">临时</n-tag>
+            </div>
+            <div class="space-y-1">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-600">临时空间:</span>
+                <span>{{ formatSize(userInfo.spaceInfo.tempSize) }}</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-600">到期时间:</span>
+                <span>{{ userInfo.spaceInfo.tempExpiredAt }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 总存储空间 -->
+          <div class="bg-gray-50 p-4 rounded-lg mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-medium text-gray-700">总存储空间</span>
+              <span class="text-sm text-gray-600">{{ getStorageUsagePercent(userInfo.spaceInfo.usedSize, userInfo.spaceInfo.totalSize) }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div 
+                class="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                :style="{ width: getStorageUsagePercent(userInfo.spaceInfo.usedSize, userInfo.spaceInfo.totalSize) + '%' }"
+              ></div>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-gray-600">已使用:</span>
+              <span>{{ formatSize(userInfo.spaceInfo.usedSize) }} / {{ formatSize(userInfo.spaceInfo.totalSize) }}</span>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="flex justify-between items-center">
+            <span>存储空间:</span>
+            <span>{{ storageInfo.used }} / {{ storageInfo.total }}</span>
+          </div>
+        </template>
       </n-space>
-
-      <template #action>
-        <n-space>
-          <n-button type="primary" @click="showAccountModal = true">
-            {{ accountStatus === 'connected' ? '重新配置' : '配置账户' }}
-          </n-button>
-          <n-button @click="syncAccount" :loading="syncing">
-            同步账户信息
-          </n-button>
-          <n-button @click="refreshToken" :loading="refreshingToken">
-            <template #icon>
-              <n-icon><RefreshOutline /></n-icon>
-            </template>
-            刷新Token
-          </n-button>
-        </n-space>
-      </template>
     </n-card>
 
-    <!-- 下载任务列表 -->
-    <n-card title="下载任务">
-      <template #header-extra>
-        <n-space>
-          <n-button @click="refreshTasks" :loading="loading">
-            <template #icon>
-              <n-icon><RefreshOutline /></n-icon>
-            </template>
-            刷新
-          </n-button>
-          <n-button type="primary" @click="showAddTaskModal = true">
-            <template #icon>
-              <n-icon><AddOutline /></n-icon>
-            </template>
-            添加任务
-          </n-button>
-        </n-space>
-      </template>
 
-      <n-data-table
-        :columns="columns"
-        :data="tasks"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="(row) => row.id"
-      />
-    </n-card>
 
-    <!-- 配置账户模态框 -->
-    <n-modal v-model:show="showAccountModal" preset="dialog" title="配置云盘账户">
-      <n-form
-        ref="accountFormRef"
-        :model="accountForm"
-        :rules="accountRules"
-        label-placement="top"
-      >
-        <n-form-item path="username" label="用户名">
-          <n-input v-model:value="accountForm.username" placeholder="请输入用户名" />
-        </n-form-item>
-        <n-form-item path="password" label="密码">
-          <n-input
-            v-model:value="accountForm.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password-on="mousedown"
-          />
-        </n-form-item>
-      </n-form>
-
-      <template #action>
-        <n-space>
-          <n-button @click="showAccountModal = false">取消</n-button>
-          <n-button type="primary" @click="saveAccount" :loading="saving">
-            保存
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
-    <!-- 添加任务模态框 -->
-    <n-modal v-model:show="showAddTaskModal" preset="dialog" title="添加下载任务">
-      <n-form
-        ref="taskFormRef"
-        :model="taskForm"
-        :rules="taskRules"
-        label-placement="top"
-      >
-        <n-form-item path="magnetLink" label="磁力链接">
-          <n-input
-            v-model:value="taskForm.magnetLink"
-            type="textarea"
-            placeholder="请输入磁力链接"
-            :rows="3"
-          />
-        </n-form-item>
-        <n-form-item path="savePath" label="保存路径">
-          <n-input v-model:value="taskForm.savePath" placeholder="请输入保存路径" />
-        </n-form-item>
-      </n-form>
-
-      <template #action>
-        <n-space>
-          <n-button @click="showAddTaskModal = false">取消</n-button>
-          <n-button type="primary" @click="addTask" :loading="adding">
-            添加
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
   </div>
 </template>
 
@@ -175,203 +151,26 @@ import {
   NCard,
   NSpace,
   NTag,
-  NButton,
-  NIcon,
-  NDataTable,
-  NModal,
-  NForm,
-  NFormItem,
-  NInput,
   NH1,
   NDivider,
+  NAvatar,
   useMessage
 } from 'naive-ui'
-import type { FormInst, FormRules, DataTableColumns } from 'naive-ui'
-import { RefreshOutline, AddOutline, TrashOutline, PauseOutline, PlayOutline } from '@vicons/ionicons5'
 import { getCloud123UserInfo } from '@/api/cloud'
 import type { Cloud123UserInfo } from '@/api/cloud'
 
-interface DownloadTask {
-  id: number
-  name: string
-  magnetLink: string
-  savePath: string
-  status: 'pending' | 'downloading' | 'completed' | 'failed' | 'paused'
-  progress: number
-  size: string
-  speed: string
-  createdAt: string
-}
-
 const message = useMessage()
-const accountFormRef = ref<FormInst | null>(null)
-const taskFormRef = ref<FormInst | null>(null)
-
-// 状态管理
-const loading = ref(false)
-const syncing = ref(false)
-const saving = ref(false)
-const adding = ref(false)
-const refreshingToken = ref(false)
-const showAccountModal = ref(false)
-const showAddTaskModal = ref(false)
 
 // 账户信息
-const accountStatus = ref<'connected' | 'disconnected'>('disconnected')
 const storageInfo = reactive({
   used: '0 GB',
   total: '0 GB'
 })
-const lastSync = ref('')
 const userInfo = ref<Cloud123UserInfo | null>(null)
 
-// 表单数据
-const accountForm = reactive({
-  username: '',
-  password: ''
-})
 
-const taskForm = reactive({
-  magnetLink: '',
-  savePath: ''
-})
 
-// 任务列表
-const tasks = ref<DownloadTask[]>([])
 
-// 分页
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  showSizePicker: true,
-  pageSizes: [10, 20, 50],
-  onChange: (page: number) => {
-    pagination.page = page
-    fetchTasks()
-  },
-  onUpdatePageSize: (pageSize: number) => {
-    pagination.pageSize = pageSize
-    pagination.page = 1
-    fetchTasks()
-  }
-})
-
-// 表单验证规则
-const accountRules: FormRules = {
-  username: [
-    {
-      required: true,
-      message: '请输入用户名',
-      trigger: ['input', 'blur']
-    }
-  ],
-  password: [
-    {
-      required: true,
-      message: '请输入密码',
-      trigger: ['input', 'blur']
-    }
-  ]
-}
-
-const taskRules: FormRules = {
-  magnetLink: [
-    {
-      required: true,
-      message: '请输入磁力链接',
-      trigger: ['input', 'blur']
-    }
-  ],
-  savePath: [
-    {
-      required: true,
-      message: '请输入保存路径',
-      trigger: ['input', 'blur']
-    }
-  ]
-}
-
-// 表格列定义
-const columns: DataTableColumns<DownloadTask> = [
-  {
-    title: '任务名称',
-    key: 'name',
-    ellipsis: {
-      tooltip: true
-    }
-  },
-  {
-    title: '状态',
-    key: 'status',
-    width: 100,
-    render(row) {
-      const statusMap = {
-        pending: { type: 'info', text: '等待中' },
-        downloading: { type: 'primary', text: '下载中' },
-        completed: { type: 'success', text: '已完成' },
-        failed: { type: 'error', text: '失败' },
-        paused: { type: 'warning', text: '已暂停' }
-      }
-      const status = statusMap[row.status] || { type: 'default', text: '未知' }
-      return h(NTag, { type: status.type as any }, { default: () => status.text })
-    }
-  },
-  {
-    title: '进度',
-    key: 'progress',
-    width: 100,
-    render(row) {
-      return `${row.progress}%`
-    }
-  },
-  {
-    title: '大小',
-    key: 'size',
-    width: 100
-  },
-  {
-    title: '速度',
-    key: 'speed',
-    width: 100
-  },
-  {
-    title: '创建时间',
-    key: 'createdAt',
-    width: 150,
-    render(row) {
-      return new Date(row.createdAt).toLocaleString('zh-CN')
-    }
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 150,
-    render(row) {
-      return h(NSpace, {}, {
-        default: () => [
-          h(NButton, {
-            size: 'small',
-            type: row.status === 'paused' ? 'primary' : 'warning',
-            onClick: () => toggleTask(row.id, row.status)
-          }, {
-            default: () => row.status === 'paused' ? '继续' : '暂停',
-            icon: () => h(NIcon, null, {
-              default: () => h(row.status === 'paused' ? PlayOutline : PauseOutline)
-            })
-          }),
-          h(NButton, {
-            size: 'small',
-            type: 'error',
-            onClick: () => deleteTask(row.id)
-          }, {
-            default: () => '删除',
-            icon: () => h(NIcon, null, { default: () => h(TrashOutline) })
-          })
-        ]
-      })
-    }
-  }
-]
 
 // 工具函数
 const formatSize = (bytes: number): string => {
@@ -408,194 +207,24 @@ const fetchAccountInfo = async () => {
     })
     const result = await response.json()
     if (result.success && result.data) {
-      accountStatus.value = result.data.connected ? 'connected' : 'disconnected'
       storageInfo.used = result.data.used || '0 GB'
       storageInfo.total = result.data.total || '0 GB'
-      lastSync.value = result.data.lastSync || ''
     }
   } catch (error) {
     console.error('获取账户信息失败:', error)
   }
 }
 
-const fetchTasks = async () => {
-  try {
-    loading.value = true
-    const response = await fetch(`/api/cloud123/tasks?page=${pagination.page}&pageSize=${pagination.pageSize}`, {
-      credentials: 'include'
-    })
-    const result = await response.json()
-    if (result.success && result.data) {
-      tasks.value = result.data.tasks || []
-      // pagination.itemCount = result.data.total || 0
-    } else {
-      message.error(result.message || '获取任务列表失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
 
-const syncAccount = async () => {
-  try {
-    syncing.value = true
-    const response = await fetch('/api/cloud123/sync', {
-      method: 'POST',
-      credentials: 'include'
-    })
-    const result = await response.json()
-    if (result.success) {
-      message.success('同步成功')
-      await Promise.all([fetchAccountInfo(), fetchUserInfo()])
-    } else {
-      message.error(result.message || '同步失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  } finally {
-    syncing.value = false
-  }
-}
 
-const refreshToken = async () => {
-  try {
-    refreshingToken.value = true
-    const response = await fetch('/api/cloud123/token/refresh', {
-      method: 'POST',
-      credentials: 'include'
-    })
-    const result = await response.json()
-    if (result.success) {
-      const data = result.data
-      if (data.refreshed) {
-        message.success(`Token已刷新成功！下次刷新时间: ${new Date(data.nextRefreshDate).toLocaleString('zh-CN')}`)
-      } else {
-        message.info(`Token状态检查完成，已使用${data.tokenAge}天，还有${data.refreshThreshold - data.tokenAge}天后需要刷新`)
-      }
-      // 刷新账户信息
-      await Promise.all([fetchAccountInfo(), fetchUserInfo()])
-    } else {
-      message.error(result.message || 'Token刷新失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  } finally {
-    refreshingToken.value = false
-  }
-}
-
-const saveAccount = async () => {
-  if (!accountFormRef.value) return
-
-  try {
-    await accountFormRef.value.validate()
-    saving.value = true
-
-    const response = await fetch('/api/cloud123/account', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(accountForm)
-    })
-
-    const result = await response.json()
-    if (result.success) {
-      message.success('账户配置成功')
-      showAccountModal.value = false
-      await fetchAccountInfo()
-    } else {
-      message.error(result.message || '配置失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  } finally {
-    saving.value = false
-  }
-}
-
-const addTask = async () => {
-  if (!taskFormRef.value) return
-
-  try {
-    await taskFormRef.value.validate()
-    adding.value = true
-
-    const response = await fetch('/api/cloud123/tasks', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(taskForm)
-    })
-
-    const result = await response.json()
-    if (result.success) {
-      message.success('任务添加成功')
-      showAddTaskModal.value = false
-      taskForm.magnetLink = ''
-      taskForm.savePath = ''
-      await fetchTasks()
-    } else {
-      message.error(result.message || '添加失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  } finally {
-    adding.value = false
-  }
-}
-
-const toggleTask = async (id: number, status: string) => {
-  try {
-    const action = status === 'paused' ? 'resume' : 'pause'
-    const response = await fetch(`/api/cloud123/tasks/${id}/${action}`, {
-      method: 'POST',
-      credentials: 'include'
-    })
-
-    const result = await response.json()
-    if (result.success) {
-      message.success(`任务${action === 'pause' ? '暂停' : '继续'}成功`)
-      await fetchTasks()
-    } else {
-      message.error(result.message || '操作失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  }
-}
-
-const deleteTask = async (id: number) => {
-  try {
-    const response = await fetch(`/api/cloud123/tasks/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
-
-    const result = await response.json()
-    if (result.success) {
-      message.success('任务删除成功')
-      await fetchTasks()
-    } else {
-      message.error(result.message || '删除失败')
-    }
-  } catch (error) {
-    message.error('网络错误，请稍后重试')
-  }
-}
-
-const refreshTasks = () => {
-  fetchTasks()
+// 工具函数
+const getStorageUsagePercent = (used: number, total: number): number => {
+  if (total === 0) return 0
+  return Math.round((used / total) * 100)
 }
 
 onMounted(() => {
   fetchAccountInfo()
   fetchUserInfo()
-  fetchTasks()
 })
 </script>

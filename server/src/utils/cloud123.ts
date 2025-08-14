@@ -339,7 +339,64 @@ export async function getFileList(env: Cloudflare.Env, params: {
 }
 
 // 获取用户信息
-export async function getUserInfo(env: Cloudflare.Env): Promise<any | null> {
+// 123云盘用户信息接口定义
+interface Cloud123UserInfoRaw {
+    uid: number;
+    nickname: string;
+    headImage: string;
+    passport: string;
+    mail: string;
+    spaceUsed: number;
+    spacePermanent: number;
+    spaceTemp: number;
+    spaceTempExpr: string;
+    vip: boolean;
+    directTraffic: number;
+    isHideUID: boolean;
+    httpsCount: number;
+    vipInfo: {
+        vipLevel: number;
+        vipLabel: string;
+        startTime: string;
+        endTime: string;
+    } | null;
+    developerInfo: {
+        startTime: string;
+        endTime: string;
+    } | null;
+}
+
+// 转换后的用户信息接口
+interface Cloud123UserInfo {
+    uid: number;
+    nickname: string;
+    passport: string;
+    mail: string;
+    avatar: string;
+    spaceInfo: {
+        usedSize: number;
+        totalSize: number;
+        tempSize: number;
+        tempExpiredAt: string;
+    };
+    vipInfo: {
+        isVip: boolean;
+        vipLevel: number | null;
+        vipLabel: string | null;
+        vipExpiredAt: number | null;
+    };
+    developerInfo: {
+        isDeveloper: boolean;
+        developerExpiredAt: number | null;
+    };
+    directTraffic: number;
+    isHideUID: boolean;
+    httpsCount: number;
+    createTime: number;
+    updateTime: number;
+}
+
+export async function getUserInfo(env: Cloudflare.Env): Promise<Cloud123UserInfo | null> {
     const accessToken = await getAccessToken(env);
     if (!accessToken) {
         throw new Error('无法获取access_token');
@@ -364,7 +421,40 @@ export async function getUserInfo(env: Cloudflare.Env): Promise<any | null> {
             throw new Error(`获取用户信息失败: ${data.message}`);
         }
 
-        return data.data;
+        const rawUserInfo = data.data as Cloud123UserInfoRaw;
+        const now = Date.now();
+        
+        // 转换数据结构以符合前端期望的格式
+        const userInfo: Cloud123UserInfo = {
+            uid: rawUserInfo.uid,
+            nickname: rawUserInfo.nickname,
+            passport: rawUserInfo.passport,
+            mail: rawUserInfo.mail,
+            avatar: rawUserInfo.headImage,
+            spaceInfo: {
+                usedSize: rawUserInfo.spaceUsed,
+                totalSize: rawUserInfo.spacePermanent + rawUserInfo.spaceTemp,
+                tempSize: rawUserInfo.spaceTemp,
+                tempExpiredAt: rawUserInfo.spaceTempExpr
+            },
+            vipInfo: {
+                isVip: rawUserInfo.vip,
+                vipLevel: rawUserInfo.vipInfo?.vipLevel || null,
+                vipLabel: rawUserInfo.vipInfo?.vipLabel || null,
+                vipExpiredAt: rawUserInfo.vipInfo?.endTime ? new Date(rawUserInfo.vipInfo.endTime).getTime() : null
+            },
+            developerInfo: {
+                isDeveloper: rawUserInfo.developerInfo !== null,
+                developerExpiredAt: rawUserInfo.developerInfo?.endTime ? new Date(rawUserInfo.developerInfo.endTime).getTime() : null
+            },
+            directTraffic: rawUserInfo.directTraffic,
+            isHideUID: rawUserInfo.isHideUID,
+            httpsCount: rawUserInfo.httpsCount,
+            createTime: now,
+            updateTime: now
+        };
+
+        return userInfo;
     } catch (error) {
         console.error('获取用户信息失败:', error);
         return null;

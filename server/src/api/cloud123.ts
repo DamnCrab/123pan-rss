@@ -298,12 +298,24 @@ app.post('/token/refresh',
             const env = c.env as Cloudflare.Env;
             const database = db(env);
 
-            const config = await database.select().from(cloudTokenTable).limit(1);
+            let config = await database.select().from(cloudTokenTable).limit(1);
             if (config.length === 0) {
-                return c.json({
-                    success: false,
-                    message: '未找到token配置'
-                }, 200);
+                // 如果没有token配置，尝试从环境变量创建
+                try {
+                    await getAccessToken(env);
+                    config = await database.select().from(cloudTokenTable).limit(1);
+                    if (config.length === 0) {
+                        return c.json({
+                            success: false,
+                            message: '无法创建token配置，请检查环境变量中的123云盘客户端信息'
+                        }, 200);
+                    }
+                } catch (error) {
+                    return c.json({
+                        success: false,
+                        message: '创建token配置失败，请检查环境变量中的123云盘客户端信息'
+                    }, 200);
+                }
             }
 
             const tokenConfig = config[0];

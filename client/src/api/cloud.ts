@@ -18,8 +18,9 @@ export interface Cloud123Status {
 // VIP信息接口
 export interface VipInfo {
   isVip: boolean
+  vipLevel: number | null
+  vipLabel: string | null
   vipExpiredAt: number | null
-  vipType: string | null
 }
 
 // 开发者信息接口
@@ -28,19 +29,27 @@ export interface DeveloperInfo {
   developerExpiredAt: number | null
 }
 
+// 空间信息接口
+export interface SpaceInfo {
+  usedSize: number
+  totalSize: number
+  tempSize: number
+  tempExpiredAt: string
+}
+
 // 用户信息接口
 export interface Cloud123UserInfo {
   uid: number
   nickname: string
   passport: string // 已脱敏的手机号
   mail: string // 已脱敏的邮箱
-  spaceInfo: {
-    usedSize: number
-    totalSize: number
-  }
+  avatar: string
+  spaceInfo: SpaceInfo
   vipInfo: VipInfo
   developerInfo: DeveloperInfo
-  avatar: string | null
+  directTraffic: number
+  isHideUID: boolean
+  httpsCount: number
   createTime: number
   updateTime: number
 }
