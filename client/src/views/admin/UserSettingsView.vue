@@ -377,9 +377,9 @@ const updateSystemSettings = async () => {
     const response = await fetch('/api/system/settings', {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify(systemForm)
     })
 
@@ -402,9 +402,7 @@ const cleanLogs = async () => {
 
     const response = await fetch('/api/system/clean-logs', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      credentials: 'include'
     })
 
     const result = await response.json()
@@ -425,9 +423,7 @@ const exportConfig = async () => {
     exporting.value = true
 
     const response = await fetch('/api/system/export-config', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      credentials: 'include'
     })
 
     if (response.ok) {
@@ -461,9 +457,7 @@ const handleImportConfig = async (options: { file: UploadFileInfo }) => {
 
     const response = await fetch('/api/system/import-config', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
+      credentials: 'include',
       body: formData
     })
 
@@ -486,9 +480,7 @@ const refreshCloudKeys = async () => {
 
     const response = await fetch('/api/cloud123/token/refresh', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      credentials: 'include'
     })
 
     const result = await response.json()
@@ -512,9 +504,7 @@ const fetchCloudStatus = async () => {
     loadingCloudStatus.value = true
 
     const response = await fetch('/api/cloud123/status', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+      credentials: 'include'
     })
 
     const result = await response.json()

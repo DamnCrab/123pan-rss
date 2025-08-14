@@ -62,11 +62,11 @@ async function checkAuth(): Promise<boolean> {
     return true
   }
   
-  // 尝试从localStorage恢复token
-  userStore.initializeFromStorage()
+  // 尝试通过API验证登录状态
+  const isAuthenticated = await userStore.initializeFromStorage()
   
-  if (!userStore.token) {
-    devLog('Auth check: No token found')
+  if (!isAuthenticated) {
+    devLog('Auth check: Authentication failed')
     return false
   }
   

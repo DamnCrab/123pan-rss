@@ -122,9 +122,10 @@ app.post('/login',
             const token = await signUserJwt(user, env);
 
             // 将JWT存储到cookie中
+            const isProduction = env.ENVIRONMENT === 'production';
             setCookie(c, 'auth_token', token, {
                 httpOnly: true,
-                secure: true,
+                secure: isProduction, // 只在生产环境使用secure
                 sameSite: 'Lax',
                 maxAge: 60 * 60 * 24 * 30 // 30天有效期
             });

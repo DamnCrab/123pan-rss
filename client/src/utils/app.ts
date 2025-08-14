@@ -53,7 +53,7 @@ export class AppInitializer {
   private static async initializeUserState(): Promise<void> {
     devLog('Initializing user state...')
     const userStore = useUserStore()
-    userStore.initializeFromStorage()
+    await userStore.initializeFromStorage()
   }
 
   /**

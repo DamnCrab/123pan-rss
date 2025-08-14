@@ -19,13 +19,13 @@ const request: AxiosInstance = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 从用户store获取token
-    const userStore = useUserStore()
-    const token = userStore.token
-    
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
+    // 不再设置Authorization header，改为使用cookie认证
+    // const userStore = useUserStore()
+    // const token = userStore.token
+    // 
+    // if (token) {
+    //   config.headers.Authorization = `Bearer ${token}`
+    // }
     
     // 添加安全头
     addSecurityHeaders(config.headers)

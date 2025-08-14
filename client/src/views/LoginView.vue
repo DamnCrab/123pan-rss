@@ -103,8 +103,12 @@ const handleLogin = async () => {
     const result = await login(encryptedLoginData)
 
     if (result.success && result.data) {
-      // 使用用户store保存token
-      userStore.setToken(result.data.token)
+      // 设置虚拟token表示已登录状态
+      userStore.setToken('authenticated')
+      // 设置用户信息
+      if (result.data.user) {
+        userStore.setUserInfo(result.data.user)
+      }
 
       message.success(result.message || '登录成功')
       router.push('/admin')

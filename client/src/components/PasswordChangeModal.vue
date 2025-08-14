@@ -421,13 +421,13 @@ const handleConfirm = async () => {
     const encryptedNewPassword = await encodePassword(formData.newPassword)
 
     const headers = addSecurityHeaders({
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Content-Type': 'application/json'
     })
 
     const response = await fetch('/api/user/password', {
       method: 'PUT',
       headers,
+      credentials: 'include',
       body: JSON.stringify({
         currentPassword: encryptedCurrentPassword,
         newPassword: encryptedNewPassword
